@@ -212,11 +212,11 @@ function bandArc(startValue, endValue, color) {
 
 function buildGaugeSvg(score) {
   const bands = [
-    bandArc(0, 25, "#e34948"), // 매수 신호대 (diverge-red)
+    bandArc(0, 25, "#f0b3b2"), // 매수 신호대 (연한 red)
     bandArc(25, 35, "#e1e0d9"), // 대기 (gridline)
-    bandArc(35, 65, "#1baf7a"), // 커버드콜 (평시) (cat-2)
+    bandArc(35, 65, "#a3ddc4"), // 커버드콜 (평시) (연한 green)
     bandArc(65, 75, "#e1e0d9"), // 대기 (gridline)
-    bandArc(75, 100, "#2a78d6"), // 매도 신호대 (diverge-blue)
+    bandArc(75, 100, "#aecbea"), // 매도 신호대 (연한 blue)
   ].join("");
 
   const needleTip = polarPoint(GAUGE_R - 30, Math.max(0, Math.min(100, score)));
@@ -400,7 +400,7 @@ function renderFgChart(data) {
   endDot.setAttribute("cx", lastX);
   endDot.setAttribute("cy", lastY);
   endDot.setAttribute("r", "4");
-  endDot.setAttribute("fill", data[n - 1].score >= 50 ? "#2a78d6" : "#e34948");
+  endDot.setAttribute("fill", data[n - 1].score >= 50 ? "#aecbea" : "#f0b3b2");
   endDot.setAttribute("stroke", "#fcfcfb");
   endDot.setAttribute("stroke-width", "2");
   svg.appendChild(endDot);
@@ -439,7 +439,7 @@ function renderFgChart(data) {
     crosshair.setAttribute("visibility", "visible");
     hoverDot.setAttribute("cx", px);
     hoverDot.setAttribute("cy", py);
-    hoverDot.setAttribute("fill", data[idx].score >= 50 ? "#2a78d6" : "#e34948");
+    hoverDot.setAttribute("fill", data[idx].score >= 50 ? "#aecbea" : "#f0b3b2");
     hoverDot.setAttribute("visibility", "visible");
 
     tooltip.style.opacity = "1";
