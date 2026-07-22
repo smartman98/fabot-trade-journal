@@ -86,7 +86,7 @@ function renderTrades(trades) {
     const meta = document.createElement("div");
     meta.className = "trade-meta";
     const fgText = t.fg_score !== null && t.fg_score !== undefined ? ` · F&G ${t.fg_score}` : "";
-    meta.textContent = `${t.trade_date} · 수량 ${t.quantity} · 가격 ${formatMoney(t.price)}${fgText}`;
+    meta.textContent = `${t.trade_date} · 수량 ${t.quantity} · 주가 ${formatMoney(t.price)}${fgText}`;
 
     main.appendChild(ticker);
     main.appendChild(meta);
@@ -136,7 +136,7 @@ function openDetail(trade) {
     <div><strong>${trade.ticker}</strong> (${trade.action === "buy" ? "매수" : "매도"})</div>
     <div>날짜: ${trade.trade_date}</div>
     <div>수량: ${trade.quantity}</div>
-    <div>가격: ${formatMoney(trade.price)}</div>
+    <div>주가: ${formatMoney(trade.price)}</div>
     <div>그때 F&G 점수: ${fgText}</div>
     <div>메모: ${trade.memo ? trade.memo.replace(/</g, "&lt;") : "(없음)"}</div>
   `;
