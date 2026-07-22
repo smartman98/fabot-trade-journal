@@ -221,13 +221,56 @@ function buildGaugeSvg(score) {
 
   const needleTip = polarPoint(GAUGE_R - 26, Math.max(0, Math.min(100, score)));
 
+  const ticks = [0, 25, 50, 75, 100]
+    .map((v) => {
+      const p = polarPoint(GAUGE_R + 15, v);
+      const anchor = v <= 10 ? "start" : v >= 90 ? "end" : "middle";
+      const dy = v === 0 || v === 100 ? 4 : 0;
+      return `<text x="${p.x.toFixed(1)}" y="${(p.y + dy).toFixed(1)}" text-anchor="${anchor}" font-size="11" fill="#9ca3af">${v}</text>`;
+    })
+    .join("");
+
   return `
-    <svg viewBox="0 0 260 145" width="220" height="123">
+    <svg viewBox="0 -10 260 160" width="220" height="135">
       ${bands}
+      ${ticks}
       <line x1="${GAUGE_CX}" y1="${GAUGE_CY}" x2="${needleTip.x.toFixed(1)}" y2="${needleTip.y.toFixed(1)}"
         stroke="#374151" stroke-width="3" stroke-linecap="round" />
       <circle cx="${GAUGE_CX}" cy="${GAUGE_CY}" r="6" fill="#374151" />
       <text x="${GAUGE_CX}" y="${GAUGE_CY - 14}" text-anchor="middle" font-size="30" font-weight="800" fill="#111827">${score.toFixed(0)}</text>
+    </svg>
+  `;
+}
+
+const TREND_W = 260;
+const TREND_H = 70;
+const TREND_PAD = { top: 6, bottom: 6, left: 4, right: 4 };
+
+function buildTrendSvg(series) {
+  if (!series || series.length < 2) return "";
+  const plotW = TREND_W - TREND_PAD.left - TREND_PAD.right;
+  const plotH = TREND_H - TREND_PAD.top - TREND_PAD.bottom;
+  const n = series.length;
+
+  const x = (i) => TREND_PAD.left + (i / (n - 1)) * plotW;
+  const y = (v) => TREND_PAD.top + (1 - v / 100) * plotH;
+  const baselineY = y(50).toFixed(1);
+
+  let lineD = "";
+  series.forEach((d, i) => {
+    lineD += (i === 0 ? "M " : "L ") + x(i).toFixed(1) + " " + y(d.score).toFixed(1) + " ";
+  });
+
+  const first = series[0].date;
+  const last = series[n - 1].date;
+
+  return `
+    <svg viewBox="0 0 ${TREND_W} ${TREND_H + 14}" width="240" height="76" class="trend-svg">
+      <line x1="${TREND_PAD.left}" y1="${baselineY}" x2="${TREND_W - TREND_PAD.right}" y2="${baselineY}"
+        stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3 3" />
+      <path d="${lineD}" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
+      <text x="${TREND_PAD.left}" y="${TREND_H + 12}" font-size="10" fill="#9ca3af">${first}</text>
+      <text x="${TREND_W - TREND_PAD.right}" y="${TREND_H + 12}" text-anchor="end" font-size="10" fill="#9ca3af">${last}</text>
     </svg>
   `;
 }
@@ -248,8 +291,15 @@ async function fetchTodaySignal() {
       <div class="gauge-wrap">${buildGaugeSvg(todaySignal.score)}</div>
       <div class="signal-text">${todaySignal.signal}</div>
       <div class="signal-meta">${whenText}</div>
+      <div id="trend-wrap" class="trend-wrap"></div>
     `;
     signalBanner.hidden = false;
+
+    const historyRes = await fetch("/api/signal/history");
+    if (historyRes.ok) {
+      const series = await historyRes.json();
+      document.getElementById("trend-wrap").innerHTML = buildTrendSvg(series);
+    }
   } catch {
     signalBanner.hidden = true;
   }

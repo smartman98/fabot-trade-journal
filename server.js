@@ -77,6 +77,25 @@ app.get("/api/signal/today", async (req, res) => {
   });
 });
 
+// F&G 추이 (최근 90개, 하루에 여러 번 계산됐으면 그날의 마지막 값만 사용)
+app.get("/api/signal/history", async (req, res) => {
+  const { data, error } = await supabase
+    .from("live_scores")
+    .select("score, computed_at")
+    .eq("source", "cnn_real")
+    .order("computed_at", { ascending: true })
+    .limit(5000);
+
+  if (error) return res.status(500).json({ error: error.message });
+
+  const byDate = new Map();
+  for (const row of data) {
+    byDate.set(row.computed_at.slice(0, 10), row.score);
+  }
+  const series = Array.from(byDate, ([date, score]) => ({ date, score })).slice(-90);
+  res.json(series);
+});
+
 // 목록 조회 + 요약 통계
 app.get("/api/trades", async (req, res) => {
   const { data, error } = await supabase
