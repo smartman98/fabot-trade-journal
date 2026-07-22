@@ -227,7 +227,7 @@ function buildGaugeSvg(score) {
       const p = polarPoint(GAUGE_R + 22, v);
       const anchor = v <= 10 ? "start" : v >= 90 ? "end" : "middle";
       const dy = v === 0 || v === 100 ? -4 : 0;
-      return `<text x="${p.x.toFixed(1)}" y="${(p.y + dy).toFixed(1)}" text-anchor="${anchor}" font-size="11" fill="#898781">${v}</text>`;
+      return `<text x="${p.x.toFixed(1)}" y="${(p.y + dy).toFixed(1)}" text-anchor="${anchor}" font-size="16" font-weight="600" fill="#52514e">${v}</text>`;
     })
     .join("");
 
