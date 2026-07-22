@@ -14,6 +14,32 @@
     <section id="signal-section">
       <h2>오늘의 신호</h2>
       <div id="signal-banner" class="signal-banner" hidden></div>
+
+      <div class="filter-row" id="filter-row">
+        <button class="filter-btn" data-range="30">최근 30일</button>
+        <button class="filter-btn active" data-range="90">최근 90일</button>
+        <button class="filter-btn" data-range="365">최근 1년</button>
+        <button class="filter-btn" data-range="all">전체</button>
+      </div>
+
+      <div class="chart-card">
+        <p class="chart-title">F&G 지수 추이</p>
+        <p class="chart-legend">
+          <span><span class="legend-swatch" style="background:#2563eb"></span>탐욕 (50 이상)</span>
+          <span><span class="legend-swatch" style="background:#ef4444"></span>공포 (50 미만)</span>
+        </p>
+        <div style="position:relative;">
+          <svg class="fg-chart" id="chart" viewBox="0 0 640 260" role="img" aria-label="F&G 지수 추이 차트"></svg>
+          <div class="tooltip" id="tooltip"></div>
+        </div>
+        <button class="table-toggle" id="table-toggle">표로 보기</button>
+        <div class="table-wrap" id="table-wrap" hidden>
+          <table>
+            <thead><tr><th>날짜</th><th>F&G 점수</th></tr></thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <hr class="section-divider" />
@@ -67,6 +93,7 @@
     </section>
   </div>
 
+  <script src="fg_data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

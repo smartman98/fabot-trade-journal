@@ -242,39 +242,6 @@ function buildGaugeSvg(score) {
   `;
 }
 
-const TREND_W = 260;
-const TREND_H = 70;
-const TREND_PAD = { top: 6, bottom: 6, left: 4, right: 4 };
-
-function buildTrendSvg(series) {
-  if (!series || series.length < 2) return "";
-  const plotW = TREND_W - TREND_PAD.left - TREND_PAD.right;
-  const plotH = TREND_H - TREND_PAD.top - TREND_PAD.bottom;
-  const n = series.length;
-
-  const x = (i) => TREND_PAD.left + (i / (n - 1)) * plotW;
-  const y = (v) => TREND_PAD.top + (1 - v / 100) * plotH;
-  const baselineY = y(50).toFixed(1);
-
-  let lineD = "";
-  series.forEach((d, i) => {
-    lineD += (i === 0 ? "M " : "L ") + x(i).toFixed(1) + " " + y(d.score).toFixed(1) + " ";
-  });
-
-  const first = series[0].date;
-  const last = series[n - 1].date;
-
-  return `
-    <svg viewBox="0 0 ${TREND_W} ${TREND_H + 14}" width="240" height="76" class="trend-svg">
-      <line x1="${TREND_PAD.left}" y1="${baselineY}" x2="${TREND_W - TREND_PAD.right}" y2="${baselineY}"
-        stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3 3" />
-      <path d="${lineD}" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" />
-      <text x="${TREND_PAD.left}" y="${TREND_H + 12}" font-size="10" fill="#9ca3af">${first}</text>
-      <text x="${TREND_W - TREND_PAD.right}" y="${TREND_H + 12}" text-anchor="end" font-size="10" fill="#9ca3af">${last}</text>
-    </svg>
-  `;
-}
-
 async function fetchTodaySignal() {
   try {
     const res = await fetch("/api/signal/today");
@@ -291,19 +258,241 @@ async function fetchTodaySignal() {
       <div class="gauge-wrap">${buildGaugeSvg(todaySignal.score)}</div>
       <div class="signal-text">${todaySignal.signal}</div>
       <div class="signal-meta">${whenText}</div>
-      <div id="trend-wrap" class="trend-wrap"></div>
     `;
     signalBanner.hidden = false;
-
-    const historyRes = await fetch("/api/signal/history");
-    if (historyRes.ok) {
-      const series = await historyRes.json();
-      document.getElementById("trend-wrap").innerHTML = buildTrendSvg(series);
-    }
   } catch {
     signalBanner.hidden = true;
   }
 }
+
+// ---------- F&G 지수 추이 차트 (fg-dashboard와 동일한 구현) ----------
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+const history = typeof FG_DATA !== "undefined" ? FG_DATA.history : [];
+
+function filterRange(rangeKey) {
+  if (rangeKey === "all") return history;
+  const days = Number(rangeKey);
+  return history.slice(-days);
+}
+
+function renderTable(data) {
+  const tbody = document.getElementById("table-body");
+  tbody.innerHTML = "";
+  const recentFirst = data.slice().reverse();
+  for (const row of recentFirst) {
+    const tr = document.createElement("tr");
+    const tdDate = document.createElement("td");
+    tdDate.textContent = row.date;
+    const tdScore = document.createElement("td");
+    tdScore.textContent = row.score.toFixed(1);
+    tr.appendChild(tdDate);
+    tr.appendChild(tdScore);
+    tbody.appendChild(tr);
+  }
+}
+
+const CHART_W = 640;
+const CHART_H = 260;
+const CHART_PAD = { top: 16, right: 12, bottom: 24, left: 30 };
+const chartPlotW = CHART_W - CHART_PAD.left - CHART_PAD.right;
+const chartPlotH = CHART_H - CHART_PAD.top - CHART_PAD.bottom;
+
+function chartXScale(i, n) {
+  if (n <= 1) return CHART_PAD.left;
+  return CHART_PAD.left + (i / (n - 1)) * chartPlotW;
+}
+function chartYScale(v) {
+  return CHART_PAD.top + (1 - v / 100) * chartPlotH;
+}
+
+function drawGridlines(svg, highlightBaseline) {
+  [0, 50, 100].forEach((v) => {
+    const line = document.createElementNS(SVG_NS, "line");
+    line.setAttribute("x1", CHART_PAD.left);
+    line.setAttribute("x2", CHART_W - CHART_PAD.right);
+    line.setAttribute("y1", chartYScale(v));
+    line.setAttribute("y2", chartYScale(v));
+    line.setAttribute("stroke", highlightBaseline && v === 50 ? "#d1d5db" : "#e5e7eb");
+    line.setAttribute("stroke-width", "1");
+    svg.appendChild(line);
+
+    const label = document.createElementNS(SVG_NS, "text");
+    label.setAttribute("x", CHART_PAD.left - 6);
+    label.setAttribute("y", chartYScale(v) + 4);
+    label.setAttribute("text-anchor", "end");
+    label.setAttribute("font-size", "10");
+    label.setAttribute("fill", "#9ca3af");
+    label.textContent = v;
+    svg.appendChild(label);
+  });
+}
+
+function createChartCrosshair(svg) {
+  const crosshair = document.createElementNS(SVG_NS, "line");
+  crosshair.setAttribute("y1", CHART_PAD.top);
+  crosshair.setAttribute("y2", CHART_H - CHART_PAD.bottom);
+  crosshair.setAttribute("stroke", "#9ca3af");
+  crosshair.setAttribute("stroke-width", "1");
+  crosshair.setAttribute("visibility", "hidden");
+  svg.appendChild(crosshair);
+  return crosshair;
+}
+
+function createChartHitArea(svg) {
+  const hitArea = document.createElementNS(SVG_NS, "rect");
+  hitArea.setAttribute("x", CHART_PAD.left);
+  hitArea.setAttribute("y", CHART_PAD.top);
+  hitArea.setAttribute("width", chartPlotW);
+  hitArea.setAttribute("height", chartPlotH);
+  hitArea.setAttribute("fill", "transparent");
+  svg.appendChild(hitArea);
+  return hitArea;
+}
+
+function renderFgChart(data) {
+  const svg = document.getElementById("chart");
+  svg.innerHTML = "";
+  const n = data.length;
+  if (n === 0) return;
+
+  const baselineY = chartYScale(50);
+  drawGridlines(svg, true);
+
+  function buildAreaPath(clampFn) {
+    let d = `M ${chartXScale(0, n)} ${baselineY} `;
+    for (let i = 0; i < n; i++) {
+      d += `L ${chartXScale(i, n)} ${chartYScale(clampFn(data[i].score))} `;
+    }
+    d += `L ${chartXScale(n - 1, n)} ${baselineY} Z`;
+    return d;
+  }
+
+  const abovePath = document.createElementNS(SVG_NS, "path");
+  abovePath.setAttribute("d", buildAreaPath((v) => Math.max(v, 50)));
+  abovePath.setAttribute("fill", "rgba(37,99,235,0.10)");
+  svg.appendChild(abovePath);
+
+  const belowPath = document.createElementNS(SVG_NS, "path");
+  belowPath.setAttribute("d", buildAreaPath((v) => Math.min(v, 50)));
+  belowPath.setAttribute("fill", "rgba(239,68,68,0.10)");
+  svg.appendChild(belowPath);
+
+  let lineD = "";
+  data.forEach((d, i) => {
+    lineD += (i === 0 ? "M " : "L ") + chartXScale(i, n) + " " + chartYScale(d.score) + " ";
+  });
+  const linePath = document.createElementNS(SVG_NS, "path");
+  linePath.setAttribute("d", lineD);
+  linePath.setAttribute("fill", "none");
+  linePath.setAttribute("stroke", "#374151");
+  linePath.setAttribute("stroke-width", "2");
+  linePath.setAttribute("stroke-linejoin", "round");
+  linePath.setAttribute("stroke-linecap", "round");
+  svg.appendChild(linePath);
+
+  const lastX = chartXScale(n - 1, n);
+  const lastY = chartYScale(data[n - 1].score);
+  const endDot = document.createElementNS(SVG_NS, "circle");
+  endDot.setAttribute("cx", lastX);
+  endDot.setAttribute("cy", lastY);
+  endDot.setAttribute("r", "4");
+  endDot.setAttribute("fill", data[n - 1].score >= 50 ? "#2563eb" : "#ef4444");
+  endDot.setAttribute("stroke", "#fff");
+  endDot.setAttribute("stroke-width", "2");
+  svg.appendChild(endDot);
+
+  const endLabel = document.createElementNS(SVG_NS, "text");
+  endLabel.setAttribute("x", lastX - 6);
+  endLabel.setAttribute("y", lastY - 10);
+  endLabel.setAttribute("text-anchor", "end");
+  endLabel.setAttribute("font-size", "12");
+  endLabel.setAttribute("font-weight", "700");
+  endLabel.setAttribute("fill", "#111827");
+  endLabel.textContent = data[n - 1].score.toFixed(1);
+  svg.appendChild(endLabel);
+
+  const crosshair = createChartCrosshair(svg);
+  const hoverDot = document.createElementNS(SVG_NS, "circle");
+  hoverDot.setAttribute("r", "5");
+  hoverDot.setAttribute("stroke", "#fff");
+  hoverDot.setAttribute("stroke-width", "2");
+  hoverDot.setAttribute("visibility", "hidden");
+  svg.appendChild(hoverDot);
+
+  const hitArea = createChartHitArea(svg);
+  const tooltip = document.getElementById("tooltip");
+
+  function showTooltipAt(clientEvtX) {
+    const rect = svg.getBoundingClientRect();
+    const relX = ((clientEvtX - rect.left) / rect.width) * CHART_W;
+    let idx = Math.round(((relX - CHART_PAD.left) / chartPlotW) * (n - 1));
+    idx = Math.max(0, Math.min(n - 1, idx));
+
+    const px = chartXScale(idx, n);
+    const py = chartYScale(data[idx].score);
+    crosshair.setAttribute("x1", px);
+    crosshair.setAttribute("x2", px);
+    crosshair.setAttribute("visibility", "visible");
+    hoverDot.setAttribute("cx", px);
+    hoverDot.setAttribute("cy", py);
+    hoverDot.setAttribute("fill", data[idx].score >= 50 ? "#2563eb" : "#ef4444");
+    hoverDot.setAttribute("visibility", "visible");
+
+    tooltip.style.opacity = "1";
+    tooltip.innerHTML = "";
+    const dateLine = document.createElement("div");
+    dateLine.textContent = data[idx].date;
+    const valueLine = document.createElement("div");
+    valueLine.className = "tt-value";
+    valueLine.textContent = data[idx].score.toFixed(1) + "점";
+    tooltip.appendChild(dateLine);
+    tooltip.appendChild(valueLine);
+
+    const svgPixelRect = svg.getBoundingClientRect();
+    const scaleX = svgPixelRect.width / CHART_W;
+    const tooltipX = px * scaleX;
+    tooltip.style.left = Math.min(tooltipX + 10, svgPixelRect.width - 110) + "px";
+    tooltip.style.top = (py * (svgPixelRect.height / CHART_H) - 40) + "px";
+  }
+
+  function hideTooltip() {
+    crosshair.setAttribute("visibility", "hidden");
+    hoverDot.setAttribute("visibility", "hidden");
+    tooltip.style.opacity = "0";
+  }
+
+  hitArea.addEventListener("pointermove", (e) => showTooltipAt(e.clientX));
+  hitArea.addEventListener("pointerleave", hideTooltip);
+}
+
+function renderFgAll(rangeKey) {
+  const data = filterRange(rangeKey);
+  renderFgChart(data);
+  renderTable(data);
+}
+
+const filterRow = document.getElementById("filter-row");
+if (filterRow) {
+  filterRow.addEventListener("click", (e) => {
+    const btn = e.target.closest(".filter-btn");
+    if (!btn) return;
+    filterRow.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    renderFgAll(btn.dataset.range);
+  });
+}
+
+const tableToggleBtn = document.getElementById("table-toggle");
+if (tableToggleBtn) {
+  tableToggleBtn.addEventListener("click", () => {
+    const wrap = document.getElementById("table-wrap");
+    wrap.hidden = !wrap.hidden;
+    tableToggleBtn.textContent = wrap.hidden ? "표로 보기" : "표 숨기기";
+  });
+}
+
+if (history.length > 0) renderFgAll("90");
 
 fetchTrades();
 fetchTodaySignal();
