@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FABOT 매매 일지</title>
+  <title>매매 일지</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div class="app">
-    <h1>FABOT 매매 일지</h1>
+    <h1>매매 일지</h1>
     <p class="sub">F&G 신호를 보고 실제로 매매한 기록을 남겨보세요.</p>
 
     <div id="summary-bar" class="summary-bar"></div>
@@ -28,7 +28,7 @@
       <h2 id="form-title">새 매매 기록</h2>
       <form id="trade-form" class="trade-form">
         <label>매매 날짜 <input type="date" id="f-date" required /></label>
-        <label>종목 <input type="text" id="f-ticker" placeholder="예: TQQQ" required /></label>
+        <label>종목 <input type="text" id="f-ticker" required /></label>
         <label>구분
           <select id="f-action" required>
             <option value="buy">매수</option>
