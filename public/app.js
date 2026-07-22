@@ -188,6 +188,50 @@ detailDeleteBtn.addEventListener("click", async () => {
   showView("list");
 });
 
+// 반원 게이지 SVG 생성 — CNN F&G 다이얼과 비슷한 형태지만,
+// 색 구간은 우리 매매 규칙(매수/대기/커버드콜/매도)을 그대로 반영한다.
+const GAUGE_CX = 130;
+const GAUGE_CY = 128;
+const GAUGE_R = 108;
+
+function polarPoint(radius, value) {
+  const angleDeg = 180 - (value / 100) * 180;
+  const angleRad = (angleDeg * Math.PI) / 180;
+  return {
+    x: GAUGE_CX + radius * Math.cos(angleRad),
+    y: GAUGE_CY - radius * Math.sin(angleRad),
+  };
+}
+
+function bandArc(startValue, endValue, color) {
+  const start = polarPoint(GAUGE_R, startValue);
+  const end = polarPoint(GAUGE_R, endValue);
+  return `<path d="M ${start.x} ${start.y} A ${GAUGE_R} ${GAUGE_R} 0 0 1 ${end.x} ${end.y}"
+    fill="none" stroke="${color}" stroke-width="20" stroke-linecap="butt" />`;
+}
+
+function buildGaugeSvg(score) {
+  const bands = [
+    bandArc(0, 25, "#ef4444"), // 매수 신호대
+    bandArc(25, 35, "#e5e7eb"), // 대기
+    bandArc(35, 65, "#6366f1"), // 커버드콜 (평시)
+    bandArc(65, 75, "#e5e7eb"), // 대기
+    bandArc(75, 100, "#2563eb"), // 매도 신호대
+  ].join("");
+
+  const needleTip = polarPoint(GAUGE_R - 26, Math.max(0, Math.min(100, score)));
+
+  return `
+    <svg viewBox="0 0 260 145" width="220" height="123">
+      ${bands}
+      <line x1="${GAUGE_CX}" y1="${GAUGE_CY}" x2="${needleTip.x.toFixed(1)}" y2="${needleTip.y.toFixed(1)}"
+        stroke="#374151" stroke-width="3" stroke-linecap="round" />
+      <circle cx="${GAUGE_CX}" cy="${GAUGE_CY}" r="6" fill="#374151" />
+      <text x="${GAUGE_CX}" y="${GAUGE_CY - 14}" text-anchor="middle" font-size="30" font-weight="800" fill="#111827">${score.toFixed(0)}</text>
+    </svg>
+  `;
+}
+
 async function fetchTodaySignal() {
   try {
     const res = await fetch("/api/signal/today");
@@ -201,11 +245,9 @@ async function fetchTodaySignal() {
     const whenText = `${when.getMonth() + 1}/${when.getDate()} ${pad(when.getHours())}:${pad(when.getMinutes())} 기준`;
 
     signalBanner.innerHTML = `
-      <div>
-        <span class="signal-score">${todaySignal.score.toFixed(1)}</span>
-        <span class="signal-text"> · ${todaySignal.signal}</span>
-      </div>
-      <span class="signal-meta">${whenText}</span>
+      <div class="gauge-wrap">${buildGaugeSvg(todaySignal.score)}</div>
+      <div class="signal-text">${todaySignal.signal}</div>
+      <div class="signal-meta">${whenText}</div>
     `;
     signalBanner.hidden = false;
   } catch {
