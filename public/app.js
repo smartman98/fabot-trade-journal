@@ -221,12 +221,14 @@ function buildGaugeSvg(score) {
 
   const needleTip = polarPoint(GAUGE_R - 30, Math.max(0, Math.min(100, score)));
 
-  // 0/100은 배지(밴드) 끝단과 같은 높이라 겹쳐 보이기 쉬워서, 살짝 더 바깥+위로 띄운다.
+  // 0/100은 밴드 끝단과 같은 높이라 겹쳐 보이기 쉬워서, 옆으로 더 밀어내고 아래로 내려서
+  // 밴드 바깥쪽 빈 공간에 오도록 한다.
   const ticks = [0, 25, 50, 75, 100]
     .map((v) => {
-      const p = polarPoint(GAUGE_R + 22, v);
+      const isEdge = v === 0 || v === 100;
+      const p = polarPoint(GAUGE_R + (isEdge ? 30 : 22), v);
       const anchor = v <= 10 ? "start" : v >= 90 ? "end" : "middle";
-      const dy = v === 0 || v === 100 ? -4 : 0;
+      const dy = isEdge ? 18 : 0;
       return `<text x="${p.x.toFixed(1)}" y="${(p.y + dy).toFixed(1)}" text-anchor="${anchor}" font-size="16" font-weight="600" fill="#52514e">${v}</text>`;
     })
     .join("");
