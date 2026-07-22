@@ -18,7 +18,7 @@ function judgeSignal(score) {
   if (score <= 25) return "TQQQ 매수 25%";
   if (score >= 80) return "TQQQ 매도 전량 (극단적 탐욕)";
   if (score >= 75) return "TQQQ 매도 50%";
-  if (score >= 35 && score <= 65) return "매수 20% (평시)";
+  if (score >= 35 && score <= 65) return "매수";
   return "대기 (매수/매도 조건 밖)";
 }
 
