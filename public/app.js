@@ -219,25 +219,28 @@ function buildGaugeSvg(score) {
     bandArc(75, 100, "#2a78d6"), // 매도 신호대 (diverge-blue)
   ].join("");
 
-  const needleTip = polarPoint(GAUGE_R - 26, Math.max(0, Math.min(100, score)));
+  const needleTip = polarPoint(GAUGE_R - 30, Math.max(0, Math.min(100, score)));
 
+  // 0/100은 배지(밴드) 끝단과 같은 높이라 겹쳐 보이기 쉬워서, 살짝 더 바깥+위로 띄운다.
   const ticks = [0, 25, 50, 75, 100]
     .map((v) => {
-      const p = polarPoint(GAUGE_R + 15, v);
+      const p = polarPoint(GAUGE_R + 22, v);
       const anchor = v <= 10 ? "start" : v >= 90 ? "end" : "middle";
-      const dy = v === 0 || v === 100 ? 4 : 0;
+      const dy = v === 0 || v === 100 ? -4 : 0;
       return `<text x="${p.x.toFixed(1)}" y="${(p.y + dy).toFixed(1)}" text-anchor="${anchor}" font-size="11" fill="#898781">${v}</text>`;
     })
     .join("");
 
+  // 바늘은 중심(pivot)에서 위쪽(180~0도)으로만 뻗으므로, 점수는 중심 아래 빈 공간에 적어서
+  // 바늘과 절대 겹치지 않게 한다.
   return `
-    <svg viewBox="0 -10 260 160" width="220" height="135">
+    <svg viewBox="-10 -14 280 190" width="220" height="149">
       ${bands}
       ${ticks}
       <line x1="${GAUGE_CX}" y1="${GAUGE_CY}" x2="${needleTip.x.toFixed(1)}" y2="${needleTip.y.toFixed(1)}"
         stroke="#52514e" stroke-width="3" stroke-linecap="round" />
       <circle cx="${GAUGE_CX}" cy="${GAUGE_CY}" r="6" fill="#52514e" />
-      <text x="${GAUGE_CX}" y="${GAUGE_CY - 14}" text-anchor="middle" font-size="30" font-weight="800" fill="#0b0b0b">${score.toFixed(0)}</text>
+      <text x="${GAUGE_CX}" y="${GAUGE_CY + 32}" text-anchor="middle" font-size="30" font-weight="800" fill="#0b0b0b">${score.toFixed(0)}</text>
     </svg>
   `;
 }
