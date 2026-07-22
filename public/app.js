@@ -212,11 +212,11 @@ function bandArc(startValue, endValue, color) {
 
 function buildGaugeSvg(score) {
   const bands = [
-    bandArc(0, 25, "#ef4444"), // 매수 신호대
-    bandArc(25, 35, "#e5e7eb"), // 대기
-    bandArc(35, 65, "#6366f1"), // 커버드콜 (평시)
-    bandArc(65, 75, "#e5e7eb"), // 대기
-    bandArc(75, 100, "#2563eb"), // 매도 신호대
+    bandArc(0, 25, "#e34948"), // 매수 신호대 (diverge-red)
+    bandArc(25, 35, "#e1e0d9"), // 대기 (gridline)
+    bandArc(35, 65, "#1baf7a"), // 커버드콜 (평시) (cat-2)
+    bandArc(65, 75, "#e1e0d9"), // 대기 (gridline)
+    bandArc(75, 100, "#2a78d6"), // 매도 신호대 (diverge-blue)
   ].join("");
 
   const needleTip = polarPoint(GAUGE_R - 26, Math.max(0, Math.min(100, score)));
@@ -226,7 +226,7 @@ function buildGaugeSvg(score) {
       const p = polarPoint(GAUGE_R + 15, v);
       const anchor = v <= 10 ? "start" : v >= 90 ? "end" : "middle";
       const dy = v === 0 || v === 100 ? 4 : 0;
-      return `<text x="${p.x.toFixed(1)}" y="${(p.y + dy).toFixed(1)}" text-anchor="${anchor}" font-size="11" fill="#9ca3af">${v}</text>`;
+      return `<text x="${p.x.toFixed(1)}" y="${(p.y + dy).toFixed(1)}" text-anchor="${anchor}" font-size="11" fill="#898781">${v}</text>`;
     })
     .join("");
 
@@ -235,9 +235,9 @@ function buildGaugeSvg(score) {
       ${bands}
       ${ticks}
       <line x1="${GAUGE_CX}" y1="${GAUGE_CY}" x2="${needleTip.x.toFixed(1)}" y2="${needleTip.y.toFixed(1)}"
-        stroke="#374151" stroke-width="3" stroke-linecap="round" />
-      <circle cx="${GAUGE_CX}" cy="${GAUGE_CY}" r="6" fill="#374151" />
-      <text x="${GAUGE_CX}" y="${GAUGE_CY - 14}" text-anchor="middle" font-size="30" font-weight="800" fill="#111827">${score.toFixed(0)}</text>
+        stroke="#52514e" stroke-width="3" stroke-linecap="round" />
+      <circle cx="${GAUGE_CX}" cy="${GAUGE_CY}" r="6" fill="#52514e" />
+      <text x="${GAUGE_CX}" y="${GAUGE_CY - 14}" text-anchor="middle" font-size="30" font-weight="800" fill="#0b0b0b">${score.toFixed(0)}</text>
     </svg>
   `;
 }
@@ -313,7 +313,7 @@ function drawGridlines(svg, highlightBaseline) {
     line.setAttribute("x2", CHART_W - CHART_PAD.right);
     line.setAttribute("y1", chartYScale(v));
     line.setAttribute("y2", chartYScale(v));
-    line.setAttribute("stroke", highlightBaseline && v === 50 ? "#d1d5db" : "#e5e7eb");
+    line.setAttribute("stroke", highlightBaseline && v === 50 ? "#c3c2b7" : "#e1e0d9");
     line.setAttribute("stroke-width", "1");
     svg.appendChild(line);
 
@@ -322,7 +322,7 @@ function drawGridlines(svg, highlightBaseline) {
     label.setAttribute("y", chartYScale(v) + 4);
     label.setAttribute("text-anchor", "end");
     label.setAttribute("font-size", "10");
-    label.setAttribute("fill", "#9ca3af");
+    label.setAttribute("fill", "#898781");
     label.textContent = v;
     svg.appendChild(label);
   });
@@ -332,7 +332,7 @@ function createChartCrosshair(svg) {
   const crosshair = document.createElementNS(SVG_NS, "line");
   crosshair.setAttribute("y1", CHART_PAD.top);
   crosshair.setAttribute("y2", CHART_H - CHART_PAD.bottom);
-  crosshair.setAttribute("stroke", "#9ca3af");
+  crosshair.setAttribute("stroke", "#898781");
   crosshair.setAttribute("stroke-width", "1");
   crosshair.setAttribute("visibility", "hidden");
   svg.appendChild(crosshair);
@@ -370,12 +370,12 @@ function renderFgChart(data) {
 
   const abovePath = document.createElementNS(SVG_NS, "path");
   abovePath.setAttribute("d", buildAreaPath((v) => Math.max(v, 50)));
-  abovePath.setAttribute("fill", "rgba(37,99,235,0.10)");
+  abovePath.setAttribute("fill", "rgba(42,120,214,0.10)");
   svg.appendChild(abovePath);
 
   const belowPath = document.createElementNS(SVG_NS, "path");
   belowPath.setAttribute("d", buildAreaPath((v) => Math.min(v, 50)));
-  belowPath.setAttribute("fill", "rgba(239,68,68,0.10)");
+  belowPath.setAttribute("fill", "rgba(227,73,72,0.10)");
   svg.appendChild(belowPath);
 
   let lineD = "";
@@ -385,7 +385,7 @@ function renderFgChart(data) {
   const linePath = document.createElementNS(SVG_NS, "path");
   linePath.setAttribute("d", lineD);
   linePath.setAttribute("fill", "none");
-  linePath.setAttribute("stroke", "#374151");
+  linePath.setAttribute("stroke", "#52514e");
   linePath.setAttribute("stroke-width", "2");
   linePath.setAttribute("stroke-linejoin", "round");
   linePath.setAttribute("stroke-linecap", "round");
@@ -397,8 +397,8 @@ function renderFgChart(data) {
   endDot.setAttribute("cx", lastX);
   endDot.setAttribute("cy", lastY);
   endDot.setAttribute("r", "4");
-  endDot.setAttribute("fill", data[n - 1].score >= 50 ? "#2563eb" : "#ef4444");
-  endDot.setAttribute("stroke", "#fff");
+  endDot.setAttribute("fill", data[n - 1].score >= 50 ? "#2a78d6" : "#e34948");
+  endDot.setAttribute("stroke", "#fcfcfb");
   endDot.setAttribute("stroke-width", "2");
   svg.appendChild(endDot);
 
@@ -408,14 +408,14 @@ function renderFgChart(data) {
   endLabel.setAttribute("text-anchor", "end");
   endLabel.setAttribute("font-size", "12");
   endLabel.setAttribute("font-weight", "700");
-  endLabel.setAttribute("fill", "#111827");
+  endLabel.setAttribute("fill", "#0b0b0b");
   endLabel.textContent = data[n - 1].score.toFixed(1);
   svg.appendChild(endLabel);
 
   const crosshair = createChartCrosshair(svg);
   const hoverDot = document.createElementNS(SVG_NS, "circle");
   hoverDot.setAttribute("r", "5");
-  hoverDot.setAttribute("stroke", "#fff");
+  hoverDot.setAttribute("stroke", "#fcfcfb");
   hoverDot.setAttribute("stroke-width", "2");
   hoverDot.setAttribute("visibility", "hidden");
   svg.appendChild(hoverDot);
@@ -436,7 +436,7 @@ function renderFgChart(data) {
     crosshair.setAttribute("visibility", "visible");
     hoverDot.setAttribute("cx", px);
     hoverDot.setAttribute("cy", py);
-    hoverDot.setAttribute("fill", data[idx].score >= 50 ? "#2563eb" : "#ef4444");
+    hoverDot.setAttribute("fill", data[idx].score >= 50 ? "#2a78d6" : "#e34948");
     hoverDot.setAttribute("visibility", "visible");
 
     tooltip.style.opacity = "1";
