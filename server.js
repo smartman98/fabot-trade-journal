@@ -11,6 +11,17 @@ app.use(express.static(path.join(__dirname, "public")));
 
 const VALID_ACTIONS = ["buy", "sell"];
 
+// FABOT 매매 규칙 (fg-dashboard의 today_signal.py와 동일한 기준)
+function judgeSignal(score) {
+  if (score <= 15) return "TQQQ 매수 100% (극단적 공포)";
+  if (score <= 20) return "TQQQ 매수 50%";
+  if (score <= 25) return "TQQQ 매수 25%";
+  if (score >= 80) return "TQQQ 매도 전량 (극단적 탐욕)";
+  if (score >= 75) return "TQQQ 매도 50%";
+  if (score >= 35 && score <= 65) return "커버드콜 추가매수 20% (평시)";
+  return "대기 (매수/매도 조건 밖)";
+}
+
 function validateTrade(body, { partial = false } = {}) {
   const errors = [];
   const trade = {};
@@ -47,6 +58,24 @@ function validateTrade(body, { partial = false } = {}) {
 
   return { trade, errors };
 }
+
+// 오늘의 F&G 신호 (fg-dashboard가 쓰는 live_scores 테이블을 그대로 조회)
+app.get("/api/signal/today", async (req, res) => {
+  const [{ data: realRows }, { data: priceRows }] = await Promise.all([
+    supabase.from("live_scores").select("*").eq("source", "cnn_real").order("computed_at", { ascending: false }).limit(1),
+    supabase.from("live_scores").select("*").eq("source", "price_based").order("computed_at", { ascending: false }).limit(1),
+  ]);
+
+  const latest = (realRows && realRows[0]) || (priceRows && priceRows[0]);
+  if (!latest) return res.status(404).json({ error: "F&G 신호 데이터가 아직 없습니다." });
+
+  res.json({
+    score: latest.score,
+    source: latest.source,
+    computed_at: latest.computed_at,
+    signal: judgeSignal(latest.score),
+  });
+});
 
 // 목록 조회 + 요약 통계
 app.get("/api/trades", async (req, res) => {

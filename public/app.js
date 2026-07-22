@@ -1,5 +1,8 @@
 const API = "/api/trades";
 
+const signalBanner = document.getElementById("signal-banner");
+let todaySignal = null;
+
 const listView = document.getElementById("list-view");
 const formView = document.getElementById("form-view");
 const detailView = document.getElementById("detail-view");
@@ -107,6 +110,7 @@ function openAddForm() {
   formTitle.textContent = "새 매매 기록";
   tradeForm.reset();
   fDate.value = new Date().toISOString().slice(0, 10);
+  if (todaySignal) fFg.value = todaySignal.score;
   formError.textContent = "";
   showView("form");
 }
@@ -184,4 +188,30 @@ detailDeleteBtn.addEventListener("click", async () => {
   showView("list");
 });
 
+async function fetchTodaySignal() {
+  try {
+    const res = await fetch("/api/signal/today");
+    if (!res.ok) {
+      signalBanner.hidden = true;
+      return;
+    }
+    todaySignal = await res.json();
+    const when = new Date(todaySignal.computed_at);
+    const pad = (n) => String(n).padStart(2, "0");
+    const whenText = `${when.getMonth() + 1}/${when.getDate()} ${pad(when.getHours())}:${pad(when.getMinutes())} 기준`;
+
+    signalBanner.innerHTML = `
+      <div>
+        <span class="signal-score">${todaySignal.score.toFixed(1)}</span>
+        <span class="signal-text"> · ${todaySignal.signal}</span>
+      </div>
+      <span class="signal-meta">${whenText}</span>
+    `;
+    signalBanner.hidden = false;
+  } catch {
+    signalBanner.hidden = true;
+  }
+}
+
 fetchTrades();
+fetchTodaySignal();
