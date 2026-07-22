@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FABOT 매매 일지</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <h1>FABOT 매매 일지</h1>
+    <p class="sub">F&G 신호를 보고 실제로 매매한 기록을 남겨보세요.</p>
+
+    <div id="summary-bar" class="summary-bar"></div>
+
+    <!-- 목록 화면 -->
+    <section id="list-view">
+      <div class="list-header">
+        <h2>매매 기록</h2>
+        <button id="add-btn" class="primary-btn">+ 새 기록 추가</button>
+      </div>
+      <div id="loading" class="muted">불러오는 중…</div>
+      <ul id="trade-list" class="trade-list"></ul>
+    </section>
+
+    <!-- 입력/수정 폼 화면 -->
+    <section id="form-view" hidden>
+      <h2 id="form-title">새 매매 기록</h2>
+      <form id="trade-form" class="trade-form">
+        <label>매매 날짜 <input type="date" id="f-date" required /></label>
+        <label>종목 <input type="text" id="f-ticker" placeholder="예: TQQQ" required /></label>
+        <label>구분
+          <select id="f-action" required>
+            <option value="buy">매수</option>
+            <option value="sell">매도</option>
+          </select>
+        </label>
+        <label>수량 <input type="number" id="f-quantity" min="0" step="any" required /></label>
+        <label>가격 <input type="number" id="f-price" min="0" step="any" required /></label>
+        <label>그때 F&G 점수 (선택) <input type="number" id="f-fg" min="0" max="100" /></label>
+        <label class="full">메모 (선택) <textarea id="f-memo" rows="3"></textarea></label>
+
+        <div class="form-actions">
+          <button type="submit" class="primary-btn">저장</button>
+          <button type="button" id="cancel-btn" class="ghost-btn">취소</button>
+        </div>
+        <p id="form-error" class="error"></p>
+      </form>
+    </section>
+
+    <!-- 상세 화면 -->
+    <section id="detail-view" hidden>
+      <h2>기록 상세</h2>
+      <div id="detail-body" class="detail-body"></div>
+      <div class="form-actions">
+        <button id="detail-edit-btn" class="primary-btn">수정</button>
+        <button id="detail-delete-btn" class="danger-btn">삭제</button>
+        <button id="detail-back-btn" class="ghost-btn">목록으로</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
