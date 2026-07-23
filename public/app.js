@@ -198,12 +198,17 @@ const GAUGE_R_OUTER = 138;
 const GAUGE_R_INNER = 46;
 const ZONE_GAP = 0.8; // 구간 사이 살짝 벌어진 틈(값 단위) — CNN처럼 조각난 느낌을 줌
 
+// 구간 경계값은 우리 매매 규칙(25/35/65/75)이 아니라, 일반적으로 통용되는 F&G 해석 기준
+// (0~24/25~44/45~55/56~75/76~100, 나무위키 등 참고)으로 맞췄다(2026-07-23, 사용자 확인).
+// 정수 구간표의 경계(24|25, 44|45, 55|56, 75|76)를 소수 점수에 맞게 중간값으로 변환.
+// lines: 좁은 호 안에 "극단적 공포"를 한 줄로 우겨넣으면 너무 빽빽해서, 2단어짜리는
+// 위/아래 두 줄로 나눠 쌓는다.
 const GAUGE_ZONES = [
-  { min: 0, max: 25, label: "극단적 공포", fill: "#eb9a86", stroke: "#d97552", text: "#7a3a22" },
-  { min: 25, max: 35, label: "공포", fill: "#f2c9a8", stroke: "#dba872", text: "#8a5a2a" },
-  { min: 35, max: 65, label: "중립", fill: "#ece6d6", stroke: "#c7bd9e", text: "#5c5640" },
-  { min: 65, max: 75, label: "탐욕", fill: "#cbe3b8", stroke: "#a0c987", text: "#3f5c2c" },
-  { min: 75, max: 100, label: "극단적 탐욕", fill: "#8fca86", stroke: "#5fa855", text: "#254a1e" },
+  { min: 0, max: 24.5, lines: ["극단적", "공포"], fill: "#eb9a86", stroke: "#d97552", text: "#7a3a22" },
+  { min: 24.5, max: 44.5, lines: ["공포"], fill: "#f2c9a8", stroke: "#dba872", text: "#8a5a2a" },
+  { min: 44.5, max: 55.5, lines: ["중립"], fill: "#ece6d6", stroke: "#c7bd9e", text: "#5c5640" },
+  { min: 55.5, max: 75.5, lines: ["탐욕"], fill: "#cbe3b8", stroke: "#a0c987", text: "#3f5c2c" },
+  { min: 75.5, max: 100, lines: ["극단적", "탐욕"], fill: "#8fca86", stroke: "#5fa855", text: "#254a1e" },
 ];
 
 function polarPoint(radius, value) {
@@ -241,7 +246,7 @@ function findZoneIndex(score) {
 // 게이지 아래 텍스트는 매매 액션("매수" 등)이 아니라 게이지와 똑같은 F&G 구간 이름을 보여준다
 // (2026-07-23, CNN처럼 순수 심리 지표만 보여주기로 함 — 실제 매매 액션은 별도 화면/로그에서 확인).
 function zoneLabel(score) {
-  return GAUGE_ZONES[findZoneIndex(score)].label;
+  return GAUGE_ZONES[findZoneIndex(score)].lines.join(" ");
 }
 
 function buildGaugeSvg(score) {
@@ -254,24 +259,46 @@ function buildGaugeSvg(score) {
     return `<path d="${sectorPath(zone.min, zone.max)}" fill="${fill}" stroke="${stroke}" stroke-width="1.5" />`;
   }).join("");
 
-  // 구간 이름표 — 글자 하나하나가 호를 따라 휘도록 textPath를 씀(CNN처럼). 보이지 않는 안내선
-  // 하나(0점~100점, 위쪽을 지나는 반원)를 만들어두고, 각 구간은 그 위의 %지점에만 글자를 얹는다.
-  // 값→각도가 선형이고 반지름이 일정해서, 호 길이 비율이 그대로 값의 %와 같다.
+  // 구간 이름표 — 글자 하나하나가 호를 따라 휘도록 textPath를 씀(CNN처럼). 보이지 않는 안내선을
+  // 반지름별로 만들어두고, 각 구간은 그 위의 %지점에만 글자를 얹는다. 값→각도가 선형이고 반지름이
+  // 일정해서, 호 길이 비율이 그대로 값의 %와 같다. "극단적 공포"처럼 2단어짜리는 한 줄에 우겨넣으면
+  // 좁은 호에서 너무 빽빽해지므로, 반지름을 살짝 다르게 잡아 위/아래 두 줄로 쌓는다.
   const ZONE_LABEL_R = (GAUGE_R_OUTER + GAUGE_R_INNER) / 2;
-  const labelArcStart = polarPoint(ZONE_LABEL_R, 0);
-  const labelArcEnd = polarPoint(ZONE_LABEL_R, 100);
-  const labelArcDef = `<path id="zoneLabelArc" fill="none"
-    d="M ${labelArcStart.x.toFixed(1)} ${labelArcStart.y.toFixed(1)}
-       A ${ZONE_LABEL_R} ${ZONE_LABEL_R} 0 0 1 ${labelArcEnd.x.toFixed(1)} ${labelArcEnd.y.toFixed(1)}" />`;
+  const LINE_STEP = 9; // 두 줄 쌓을 때 위/아래로 벌리는 반지름 폭
+
+  function labelArcPathId(radius) {
+    return `zoneLabelArc${Math.round(radius * 10)}`;
+  }
+  function labelArcDefFor(radius) {
+    const start = polarPoint(radius, 0);
+    const end = polarPoint(radius, 100);
+    return `<path id="${labelArcPathId(radius)}" fill="none"
+      d="M ${start.x.toFixed(1)} ${start.y.toFixed(1)}
+         A ${radius} ${radius} 0 0 1 ${end.x.toFixed(1)} ${end.y.toFixed(1)}" />`;
+  }
+
+  const usedRadii = new Set();
+  GAUGE_ZONES.forEach((zone) => {
+    if (zone.lines.length === 1) {
+      usedRadii.add(ZONE_LABEL_R);
+    } else {
+      usedRadii.add(ZONE_LABEL_R + LINE_STEP);
+      usedRadii.add(ZONE_LABEL_R - LINE_STEP);
+    }
+  });
+  const labelArcDef = [...usedRadii].map(labelArcDefFor).join("");
 
   const zoneLabels = GAUGE_ZONES.map((zone, i) => {
     const active = i === activeIdx;
     const mid = (zone.min + zone.max) / 2;
     const fill = active ? zone.text : "#9b988f";
     const weight = active ? 800 : 700;
-    return `<text font-size="12" font-weight="${weight}" fill="${fill}">
-      <textPath href="#zoneLabelArc" startOffset="${mid}%" text-anchor="middle" letter-spacing="0.5">${zone.label}</textPath>
-    </text>`;
+    const radii = zone.lines.length === 1 ? [ZONE_LABEL_R] : [ZONE_LABEL_R + LINE_STEP, ZONE_LABEL_R - LINE_STEP];
+    return zone.lines
+      .map((line, li) => `<text font-size="11" font-weight="${weight}" fill="${fill}">
+        <textPath href="#${labelArcPathId(radii[li])}" startOffset="${mid}%" text-anchor="middle" letter-spacing="0.5">${line}</textPath>
+      </text>`)
+      .join("");
   }).join("");
 
   // 조각 바깥 경계에 작은 점 + 바깥쪽 여백에 숫자 눈금(0/25/50/75/100).
