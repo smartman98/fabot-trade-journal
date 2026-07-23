@@ -192,10 +192,10 @@ detailDeleteBtn.addEventListener("click", async () => {
 // 웨지(부채꼴) 5구간 + 현재 구간만 색칠하는 방식으로 만든다. 구간 경계값(25/35/65/75)은
 // 우리 매매 규칙 그대로 쓰되, CNN처럼 "대기" 같은 빈 구간 없이 5구간이 끊김없이 이어지도록
 // 이름만 공포/탐욕으로 채웠다(2026-07-23, 사용자가 CNN 실제 화면 캡처로 확인 후 결정).
-const GAUGE_CX = 150;
-const GAUGE_CY = 158;
-const GAUGE_R_OUTER = 138;
-const GAUGE_R_INNER = 46;
+const GAUGE_CX = 180;
+const GAUGE_CY = 190;
+const GAUGE_R_OUTER = 166;
+const GAUGE_R_INNER = 55;
 const ZONE_GAP = 0.8; // 구간 사이 살짝 벌어진 틈(값 단위) — CNN처럼 조각난 느낌을 줌
 
 // 구간 경계값은 우리 매매 규칙(25/35/65/75)이 아니라, 일반적으로 통용되는 F&G 해석 기준
@@ -264,7 +264,7 @@ function buildGaugeSvg(score) {
   // 일정해서, 호 길이 비율이 그대로 값의 %와 같다. "극단적 공포"처럼 2단어짜리는 한 줄에 우겨넣으면
   // 좁은 호에서 너무 빽빽해지므로, 반지름을 살짝 다르게 잡아 위/아래 두 줄로 쌓는다.
   const ZONE_LABEL_R = (GAUGE_R_OUTER + GAUGE_R_INNER) / 2;
-  const LINE_STEP = 9; // 두 줄 쌓을 때 위/아래로 벌리는 반지름 폭
+  const LINE_STEP = 11; // 두 줄 쌓을 때 위/아래로 벌리는 반지름 폭
 
   function labelArcPathId(radius) {
     return `zoneLabelArc${Math.round(radius * 10)}`;
@@ -295,23 +295,23 @@ function buildGaugeSvg(score) {
     const weight = active ? 800 : 700;
     const radii = zone.lines.length === 1 ? [ZONE_LABEL_R] : [ZONE_LABEL_R + LINE_STEP, ZONE_LABEL_R - LINE_STEP];
     return zone.lines
-      .map((line, li) => `<text font-size="11" font-weight="${weight}" fill="${fill}">
+      .map((line, li) => `<text font-size="13" font-weight="${weight}" fill="${fill}">
         <textPath href="#${labelArcPathId(radii[li])}" startOffset="${mid}%" text-anchor="middle" letter-spacing="0.5">${line}</textPath>
       </text>`)
       .join("");
   }).join("");
 
-  // 조각 바깥 경계에 작은 점 + 바깥쪽 여백에 숫자 눈금(0/25/50/75/100).
+  // 조각 바깥 경계에 작은 점 + 바깥쪽 여백에 숫자 눈금(0/25/50/75/100) — 진한 검정 볼드로 표시.
   const tickMarks = [0, 25, 50, 75, 100]
     .map((v) => {
       const dot = polarPoint(GAUGE_R_OUTER, v);
       const isEdge = v === 0 || v === 100;
-      const label = polarPoint(GAUGE_R_OUTER + (isEdge ? 26 : 20), v);
+      const label = polarPoint(GAUGE_R_OUTER + (isEdge ? 30 : 24), v);
       const anchor = v <= 10 ? "start" : v >= 90 ? "end" : "middle";
-      const dy = isEdge ? 16 : 0;
+      const dy = isEdge ? 18 : 0;
       return (
-        `<circle cx="${dot.x.toFixed(1)}" cy="${dot.y.toFixed(1)}" r="2.5" fill="#c7c4b8" />` +
-        `<text x="${label.x.toFixed(1)}" y="${(label.y + dy).toFixed(1)}" text-anchor="${anchor}" font-size="13" font-weight="600" fill="#9b988f">${v}</text>`
+        `<circle cx="${dot.x.toFixed(1)}" cy="${dot.y.toFixed(1)}" r="3" fill="#c7c4b8" />` +
+        `<text x="${label.x.toFixed(1)}" y="${(label.y + dy).toFixed(1)}" text-anchor="${anchor}" font-size="16" font-weight="800" fill="#0b0b0b">${v}</text>`
       );
     })
     .join("");
@@ -320,11 +320,11 @@ function buildGaugeSvg(score) {
   const clampedScore = Math.max(0, Math.min(100, score));
   const needleTip = polarPoint(GAUGE_R_INNER + (GAUGE_R_OUTER - GAUGE_R_INNER) * 0.6, clampedScore);
   const needleAngle = (180 - (clampedScore / 100) * 180 + 90) * (Math.PI / 180);
-  const perpX = Math.cos(needleAngle) * 4;
-  const perpY = -Math.sin(needleAngle) * 4;
+  const perpX = Math.cos(needleAngle) * 5;
+  const perpY = -Math.sin(needleAngle) * 5;
 
   return `
-    <svg viewBox="-42 -18 384 224" style="width: 100%; height: auto; max-width: 320px; display: block;">
+    <svg viewBox="-50 -22 461 269" style="width: 100%; height: auto; max-width: 380px; display: block;">
       <defs>${labelArcDef}</defs>
       ${sectors}
       ${zoneLabels}
@@ -333,9 +333,9 @@ function buildGaugeSvg(score) {
         L ${needleTip.x.toFixed(1)} ${needleTip.y.toFixed(1)}
         L ${(GAUGE_CX + perpX).toFixed(1)} ${(GAUGE_CY + perpY).toFixed(1)} Z"
         fill="#2b2a27" />
-      <circle cx="${GAUGE_CX}" cy="${GAUGE_CY}" r="8" fill="#2b2a27" />
-      <circle cx="${GAUGE_CX}" cy="${GAUGE_CY}" r="3.5" fill="#fcfcfb" />
-      <text x="${GAUGE_CX}" y="${GAUGE_CY + 40}" text-anchor="middle" font-size="34" font-weight="800" fill="#0b0b0b">${score.toFixed(0)}</text>
+      <circle cx="${GAUGE_CX}" cy="${GAUGE_CY}" r="9" fill="#2b2a27" />
+      <circle cx="${GAUGE_CX}" cy="${GAUGE_CY}" r="4" fill="#fcfcfb" />
+      <text x="${GAUGE_CX}" y="${GAUGE_CY + 46}" text-anchor="middle" font-size="40" font-weight="800" fill="#0b0b0b">${score.toFixed(0)}</text>
     </svg>
   `;
 }
