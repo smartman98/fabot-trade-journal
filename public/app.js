@@ -233,11 +233,27 @@ function buildGaugeSvg(score) {
     })
     .join("");
 
+  // 구간 이름표 — 각 색 밴드의 가운데 각도에, 밴드 색 위에 바로 얹어서 표시한다.
+  // 좁은 대기 구간(25~35, 65~75)은 10점폭(18도)밖에 안 돼서 짧은 라벨만 들어감.
+  const zoneLabels = [
+    { mid: 12.5, text: "극단적 공포" },
+    { mid: 30, text: "대기" },
+    { mid: 50, text: "중립" },
+    { mid: 70, text: "대기" },
+    { mid: 87.5, text: "극단적 탐욕" },
+  ]
+    .map(({ mid, text }) => {
+      const p = polarPoint(GAUGE_R, mid);
+      return `<text x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="9" font-weight="700" fill="#3d3c38">${text}</text>`;
+    })
+    .join("");
+
   // 바늘은 중심(pivot)에서 위쪽(180~0도)으로만 뻗으므로, 점수는 중심 아래 빈 공간에 적어서
   // 바늘과 절대 겹치지 않게 한다.
   return `
     <svg viewBox="-10 -14 280 190" width="220" height="149">
       ${bands}
+      ${zoneLabels}
       ${ticks}
       <line x1="${GAUGE_CX}" y1="${GAUGE_CY}" x2="${needleTip.x.toFixed(1)}" y2="${needleTip.y.toFixed(1)}"
         stroke="#52514e" stroke-width="3" stroke-linecap="round" />
