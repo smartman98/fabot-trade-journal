@@ -238,6 +238,12 @@ function findZoneIndex(score) {
   return idx === -1 ? GAUGE_ZONES.length - 1 : idx; // score === 100은 마지막 구간
 }
 
+// 게이지 아래 텍스트는 매매 액션("매수" 등)이 아니라 게이지와 똑같은 F&G 구간 이름을 보여준다
+// (2026-07-23, CNN처럼 순수 심리 지표만 보여주기로 함 — 실제 매매 액션은 별도 화면/로그에서 확인).
+function zoneLabel(score) {
+  return GAUGE_ZONES[findZoneIndex(score)].label;
+}
+
 function buildGaugeSvg(score) {
   const activeIdx = findZoneIndex(score);
 
@@ -248,18 +254,24 @@ function buildGaugeSvg(score) {
     return `<path d="${sectorPath(zone.min, zone.max)}" fill="${fill}" stroke="${stroke}" stroke-width="1.5" />`;
   }).join("");
 
-  // 구간 이름표 — 조각 가운데 각도에서, 그 각도의 접선 방향으로 회전시켜 CNN처럼 호를 따라가게 함.
+  // 구간 이름표 — 글자 하나하나가 호를 따라 휘도록 textPath를 씀(CNN처럼). 보이지 않는 안내선
+  // 하나(0점~100점, 위쪽을 지나는 반원)를 만들어두고, 각 구간은 그 위의 %지점에만 글자를 얹는다.
+  // 값→각도가 선형이고 반지름이 일정해서, 호 길이 비율이 그대로 값의 %와 같다.
+  const ZONE_LABEL_R = (GAUGE_R_OUTER + GAUGE_R_INNER) / 2;
+  const labelArcStart = polarPoint(ZONE_LABEL_R, 0);
+  const labelArcEnd = polarPoint(ZONE_LABEL_R, 100);
+  const labelArcDef = `<path id="zoneLabelArc" fill="none"
+    d="M ${labelArcStart.x.toFixed(1)} ${labelArcStart.y.toFixed(1)}
+       A ${ZONE_LABEL_R} ${ZONE_LABEL_R} 0 0 1 ${labelArcEnd.x.toFixed(1)} ${labelArcEnd.y.toFixed(1)}" />`;
+
   const zoneLabels = GAUGE_ZONES.map((zone, i) => {
     const active = i === activeIdx;
     const mid = (zone.min + zone.max) / 2;
-    const p = polarPoint((GAUGE_R_OUTER + GAUGE_R_INNER) / 2, mid);
-    const angleDeg = 180 - (mid / 100) * 180;
-    const rotate = angleDeg - 90; // 0점 근처는 세로로, 50점 근처는 가로로 눕는다(CNN과 동일)
     const fill = active ? zone.text : "#9b988f";
-    const weight = active ? 800 : 600;
-    return `<text x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle"
-      font-size="11" font-weight="${weight}" fill="${fill}"
-      transform="rotate(${rotate.toFixed(1)} ${p.x.toFixed(1)} ${p.y.toFixed(1)})">${zone.label}</text>`;
+    const weight = active ? 800 : 700;
+    return `<text font-size="12" font-weight="${weight}" fill="${fill}">
+      <textPath href="#zoneLabelArc" startOffset="${mid}%" text-anchor="middle" letter-spacing="0.5">${zone.label}</textPath>
+    </text>`;
   }).join("");
 
   // 조각 바깥 경계에 작은 점 + 바깥쪽 여백에 숫자 눈금(0/25/50/75/100).
@@ -286,6 +298,7 @@ function buildGaugeSvg(score) {
 
   return `
     <svg viewBox="-42 -18 384 224" style="width: 100%; height: auto; max-width: 320px; display: block;">
+      <defs>${labelArcDef}</defs>
       ${sectors}
       ${zoneLabels}
       ${tickMarks}
@@ -314,7 +327,7 @@ async function fetchTodaySignal() {
 
     signalBanner.innerHTML = `
       <div class="gauge-wrap">${buildGaugeSvg(todaySignal.score)}</div>
-      <div class="signal-text">${todaySignal.signal}</div>
+      <div class="signal-text">${zoneLabel(todaySignal.score)}</div>
       <div class="signal-meta">${whenText}</div>
     `;
     signalBanner.hidden = false;
