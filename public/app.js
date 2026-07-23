@@ -291,8 +291,8 @@ function buildGaugeSvg(score) {
   const zoneLabels = GAUGE_ZONES.map((zone, i) => {
     const active = i === activeIdx;
     const mid = (zone.min + zone.max) / 2;
-    const fill = active ? zone.text : "#9b988f";
-    const weight = active ? 800 : 700;
+    const fill = active ? zone.text : "#4a4844";
+    const weight = 800;
     const radii = zone.lines.length === 1 ? [ZONE_LABEL_R] : [ZONE_LABEL_R + LINE_STEP, ZONE_LABEL_R - LINE_STEP];
     return zone.lines
       .map((line, li) => `<text font-size="13" font-weight="${weight}" fill="${fill}">
