@@ -188,11 +188,23 @@ detailDeleteBtn.addEventListener("click", async () => {
   showView("list");
 });
 
-// 반원 게이지 SVG 생성 — CNN F&G 다이얼과 비슷한 형태지만,
-// 색 구간은 우리 매매 규칙(매수/대기/커버드콜/매도)을 그대로 반영한다.
-const GAUGE_CX = 130;
-const GAUGE_CY = 128;
-const GAUGE_R = 108;
+// 반원 게이지 SVG 생성 — CNN F&G 다이얼(edition.cnn.com/markets/fear-and-greed)을 참고해서
+// 웨지(부채꼴) 5구간 + 현재 구간만 색칠하는 방식으로 만든다. 구간 경계값(25/35/65/75)은
+// 우리 매매 규칙 그대로 쓰되, CNN처럼 "대기" 같은 빈 구간 없이 5구간이 끊김없이 이어지도록
+// 이름만 공포/탐욕으로 채웠다(2026-07-23, 사용자가 CNN 실제 화면 캡처로 확인 후 결정).
+const GAUGE_CX = 150;
+const GAUGE_CY = 158;
+const GAUGE_R_OUTER = 138;
+const GAUGE_R_INNER = 46;
+const ZONE_GAP = 0.8; // 구간 사이 살짝 벌어진 틈(값 단위) — CNN처럼 조각난 느낌을 줌
+
+const GAUGE_ZONES = [
+  { min: 0, max: 25, label: "극단적 공포", fill: "#eb9a86", stroke: "#d97552", text: "#7a3a22" },
+  { min: 25, max: 35, label: "공포", fill: "#f2c9a8", stroke: "#dba872", text: "#8a5a2a" },
+  { min: 35, max: 65, label: "중립", fill: "#ece6d6", stroke: "#c7bd9e", text: "#5c5640" },
+  { min: 65, max: 75, label: "탐욕", fill: "#cbe3b8", stroke: "#a0c987", text: "#3f5c2c" },
+  { min: 75, max: 100, label: "극단적 탐욕", fill: "#8fca86", stroke: "#5fa855", text: "#254a1e" },
+];
 
 function polarPoint(radius, value) {
   const angleDeg = 180 - (value / 100) * 180;
@@ -203,62 +215,87 @@ function polarPoint(radius, value) {
   };
 }
 
-function bandArc(startValue, endValue, color) {
-  const start = polarPoint(GAUGE_R, startValue);
-  const end = polarPoint(GAUGE_R, endValue);
-  return `<path d="M ${start.x} ${start.y} A ${GAUGE_R} ${GAUGE_R} 0 0 1 ${end.x} ${end.y}"
-    fill="none" stroke="${color}" stroke-width="20" stroke-linecap="butt" />`;
+// 부채꼴(annular sector) 한 조각의 SVG path — 안쪽 반지름부터 바깥 반지름까지 꽉 채운다
+// (CNN처럼 얇은 링이 아니라 두툼한 조각 모양).
+function sectorPath(minValue, maxValue) {
+  const a = minValue + ZONE_GAP;
+  const b = maxValue - ZONE_GAP;
+  const outerStart = polarPoint(GAUGE_R_OUTER, a);
+  const outerEnd = polarPoint(GAUGE_R_OUTER, b);
+  const innerEnd = polarPoint(GAUGE_R_INNER, b);
+  const innerStart = polarPoint(GAUGE_R_INNER, a);
+  return (
+    `M ${outerStart.x.toFixed(1)} ${outerStart.y.toFixed(1)} ` +
+    `A ${GAUGE_R_OUTER} ${GAUGE_R_OUTER} 0 0 1 ${outerEnd.x.toFixed(1)} ${outerEnd.y.toFixed(1)} ` +
+    `L ${innerEnd.x.toFixed(1)} ${innerEnd.y.toFixed(1)} ` +
+    `A ${GAUGE_R_INNER} ${GAUGE_R_INNER} 0 0 0 ${innerStart.x.toFixed(1)} ${innerStart.y.toFixed(1)} Z`
+  );
+}
+
+function findZoneIndex(score) {
+  const clamped = Math.max(0, Math.min(100, score));
+  const idx = GAUGE_ZONES.findIndex((z) => clamped >= z.min && clamped < z.max);
+  return idx === -1 ? GAUGE_ZONES.length - 1 : idx; // score === 100은 마지막 구간
 }
 
 function buildGaugeSvg(score) {
-  const bands = [
-    bandArc(0, 25, "#f0b3b2"), // 매수 신호대 (연한 red)
-    bandArc(25, 35, "#e1e0d9"), // 대기 (gridline)
-    bandArc(35, 65, "#a3ddc4"), // 커버드콜 (평시) (연한 green)
-    bandArc(65, 75, "#e1e0d9"), // 대기 (gridline)
-    bandArc(75, 100, "#aecbea"), // 매도 신호대 (연한 blue)
-  ].join("");
+  const activeIdx = findZoneIndex(score);
 
-  const needleTip = polarPoint(GAUGE_R - 30, Math.max(0, Math.min(100, score)));
+  const sectors = GAUGE_ZONES.map((zone, i) => {
+    const active = i === activeIdx;
+    const fill = active ? zone.fill : "#ffffff";
+    const stroke = active ? zone.stroke : "#e1e0d9";
+    return `<path d="${sectorPath(zone.min, zone.max)}" fill="${fill}" stroke="${stroke}" stroke-width="1.5" />`;
+  }).join("");
 
-  // 0/100은 밴드 끝단과 같은 높이라 겹쳐 보이기 쉬워서, 옆으로 더 밀어내고 아래로 내려서
-  // 밴드 바깥쪽 빈 공간에 오도록 한다.
-  const ticks = [0, 25, 50, 75, 100]
+  // 구간 이름표 — 조각 가운데 각도에서, 그 각도의 접선 방향으로 회전시켜 CNN처럼 호를 따라가게 함.
+  const zoneLabels = GAUGE_ZONES.map((zone, i) => {
+    const active = i === activeIdx;
+    const mid = (zone.min + zone.max) / 2;
+    const p = polarPoint((GAUGE_R_OUTER + GAUGE_R_INNER) / 2, mid);
+    const angleDeg = 180 - (mid / 100) * 180;
+    const rotate = angleDeg - 90; // 0점 근처는 세로로, 50점 근처는 가로로 눕는다(CNN과 동일)
+    const fill = active ? zone.text : "#9b988f";
+    const weight = active ? 800 : 600;
+    return `<text x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle"
+      font-size="11" font-weight="${weight}" fill="${fill}"
+      transform="rotate(${rotate.toFixed(1)} ${p.x.toFixed(1)} ${p.y.toFixed(1)})">${zone.label}</text>`;
+  }).join("");
+
+  // 조각 바깥 경계에 작은 점 + 바깥쪽 여백에 숫자 눈금(0/25/50/75/100).
+  const tickMarks = [0, 25, 50, 75, 100]
     .map((v) => {
+      const dot = polarPoint(GAUGE_R_OUTER, v);
       const isEdge = v === 0 || v === 100;
-      const p = polarPoint(GAUGE_R + (isEdge ? 30 : 22), v);
+      const label = polarPoint(GAUGE_R_OUTER + (isEdge ? 26 : 20), v);
       const anchor = v <= 10 ? "start" : v >= 90 ? "end" : "middle";
-      const dy = isEdge ? 18 : 0;
-      return `<text x="${p.x.toFixed(1)}" y="${(p.y + dy).toFixed(1)}" text-anchor="${anchor}" font-size="16" font-weight="600" fill="#52514e">${v}</text>`;
+      const dy = isEdge ? 16 : 0;
+      return (
+        `<circle cx="${dot.x.toFixed(1)}" cy="${dot.y.toFixed(1)}" r="2.5" fill="#c7c4b8" />` +
+        `<text x="${label.x.toFixed(1)}" y="${(label.y + dy).toFixed(1)}" text-anchor="${anchor}" font-size="13" font-weight="600" fill="#9b988f">${v}</text>`
+      );
     })
     .join("");
 
-  // 구간 이름표 — 각 색 밴드의 가운데 각도에, 밴드 색 위에 바로 얹어서 표시한다.
-  // 좁은 대기 구간(25~35, 65~75)은 10점폭(18도)밖에 안 돼서 짧은 라벨만 들어감.
-  const zoneLabels = [
-    { mid: 12.5, text: "극단적 공포" },
-    { mid: 30, text: "대기" },
-    { mid: 50, text: "중립" },
-    { mid: 70, text: "대기" },
-    { mid: 87.5, text: "극단적 탐욕" },
-  ]
-    .map(({ mid, text }) => {
-      const p = polarPoint(GAUGE_R, mid);
-      return `<text x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}" text-anchor="middle" dominant-baseline="middle" font-size="9" font-weight="700" fill="#3d3c38">${text}</text>`;
-    })
-    .join("");
+  // 바늘 — 중심(pivot)에서 살짝 굵은 쐐기 모양으로, 조각 안쪽까지만 뻗어서(CNN처럼 바깥 테두리엔 안 닿음).
+  const clampedScore = Math.max(0, Math.min(100, score));
+  const needleTip = polarPoint(GAUGE_R_INNER + (GAUGE_R_OUTER - GAUGE_R_INNER) * 0.6, clampedScore);
+  const needleAngle = (180 - (clampedScore / 100) * 180 + 90) * (Math.PI / 180);
+  const perpX = Math.cos(needleAngle) * 4;
+  const perpY = -Math.sin(needleAngle) * 4;
 
-  // 바늘은 중심(pivot)에서 위쪽(180~0도)으로만 뻗으므로, 점수는 중심 아래 빈 공간에 적어서
-  // 바늘과 절대 겹치지 않게 한다.
   return `
-    <svg viewBox="-10 -14 280 190" width="220" height="149">
-      ${bands}
+    <svg viewBox="-42 -18 384 224" style="width: 100%; height: auto; max-width: 320px; display: block;">
+      ${sectors}
       ${zoneLabels}
-      ${ticks}
-      <line x1="${GAUGE_CX}" y1="${GAUGE_CY}" x2="${needleTip.x.toFixed(1)}" y2="${needleTip.y.toFixed(1)}"
-        stroke="#52514e" stroke-width="3" stroke-linecap="round" />
-      <circle cx="${GAUGE_CX}" cy="${GAUGE_CY}" r="6" fill="#52514e" />
-      <text x="${GAUGE_CX}" y="${GAUGE_CY + 32}" text-anchor="middle" font-size="30" font-weight="800" fill="#0b0b0b">${score.toFixed(0)}</text>
+      ${tickMarks}
+      <path d="M ${(GAUGE_CX - perpX).toFixed(1)} ${(GAUGE_CY - perpY).toFixed(1)}
+        L ${needleTip.x.toFixed(1)} ${needleTip.y.toFixed(1)}
+        L ${(GAUGE_CX + perpX).toFixed(1)} ${(GAUGE_CY + perpY).toFixed(1)} Z"
+        fill="#2b2a27" />
+      <circle cx="${GAUGE_CX}" cy="${GAUGE_CY}" r="8" fill="#2b2a27" />
+      <circle cx="${GAUGE_CX}" cy="${GAUGE_CY}" r="3.5" fill="#fcfcfb" />
+      <text x="${GAUGE_CX}" y="${GAUGE_CY + 40}" text-anchor="middle" font-size="34" font-weight="800" fill="#0b0b0b">${score.toFixed(0)}</text>
     </svg>
   `;
 }
