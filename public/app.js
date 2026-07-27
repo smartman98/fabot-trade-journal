@@ -23,7 +23,37 @@ const fAction = document.getElementById("f-action");
 const fQuantity = document.getElementById("f-quantity");
 const fPrice = document.getElementById("f-price");
 const fFg = document.getElementById("f-fg");
+const fAccount = document.getElementById("f-account");
+const fAccountCustomWrap = document.getElementById("f-account-custom-wrap");
+const fAccountCustom = document.getElementById("f-account-custom");
 const fMemo = document.getElementById("f-memo");
+
+const KNOWN_ACCOUNTS = ["키움 실전투자", "키움 모의투자", "KIS 모의투자"];
+
+function setAccountValue(account) {
+  if (!account) {
+    fAccount.value = "";
+    fAccountCustomWrap.hidden = true;
+    fAccountCustom.value = "";
+  } else if (KNOWN_ACCOUNTS.includes(account)) {
+    fAccount.value = account;
+    fAccountCustomWrap.hidden = true;
+    fAccountCustom.value = "";
+  } else {
+    fAccount.value = "__custom__";
+    fAccountCustomWrap.hidden = false;
+    fAccountCustom.value = account;
+  }
+}
+
+function getAccountValue() {
+  if (fAccount.value === "__custom__") return fAccountCustom.value.trim() || null;
+  return fAccount.value || null;
+}
+
+fAccount.addEventListener("change", () => {
+  fAccountCustomWrap.hidden = fAccount.value !== "__custom__";
+});
 
 const detailBody = document.getElementById("detail-body");
 const detailEditBtn = document.getElementById("detail-edit-btn");
@@ -86,7 +116,8 @@ function renderTrades(trades) {
     const meta = document.createElement("div");
     meta.className = "trade-meta";
     const fgText = t.fg_score !== null && t.fg_score !== undefined ? ` · F&G ${t.fg_score}` : "";
-    meta.textContent = `${t.trade_date} · 수량 ${t.quantity} · 주가 ${formatMoney(t.price)}${fgText}`;
+    const accountText = t.account ? ` · ${t.account}` : "";
+    meta.textContent = `${t.trade_date} · 수량 ${t.quantity} · 주가 ${formatMoney(t.price)}${fgText}${accountText}`;
 
     main.appendChild(ticker);
     main.appendChild(meta);
@@ -111,6 +142,7 @@ function openAddForm() {
   tradeForm.reset();
   fDate.value = new Date().toISOString().slice(0, 10);
   if (todaySignal) fFg.value = todaySignal.score;
+  setAccountValue(null);
   formError.textContent = "";
   showView("form");
 }
@@ -124,6 +156,7 @@ function openEditForm(trade) {
   fQuantity.value = trade.quantity;
   fPrice.value = trade.price;
   fFg.value = trade.fg_score ?? "";
+  setAccountValue(trade.account ?? null);
   fMemo.value = trade.memo ?? "";
   formError.textContent = "";
   showView("form");
@@ -138,6 +171,7 @@ function openDetail(trade) {
     <div>수량: ${trade.quantity}</div>
     <div>주가: ${formatMoney(trade.price)}</div>
     <div>그때 F&G 점수: ${fgText}</div>
+    <div>계좌: ${trade.account ? trade.account.replace(/</g, "&lt;") : "(없음)"}</div>
     <div>메모: ${trade.memo ? trade.memo.replace(/</g, "&lt;") : "(없음)"}</div>
   `;
   showView("detail");
@@ -154,6 +188,7 @@ tradeForm.addEventListener("submit", async (e) => {
     quantity: fQuantity.value,
     price: fPrice.value,
     fg_score: fFg.value === "" ? null : fFg.value,
+    account: getAccountValue(),
     memo: fMemo.value.trim() || null,
   };
 

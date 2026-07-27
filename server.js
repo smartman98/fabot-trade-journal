@@ -56,6 +56,8 @@ function validateTrade(body, { partial = false } = {}) {
 
   if (body.memo !== undefined) trade.memo = body.memo ? String(body.memo).trim() : null;
 
+  if (body.account !== undefined) trade.account = body.account ? String(body.account).trim() : null;
+
   return { trade, errors };
 }
 

@@ -67,6 +67,16 @@
         <label>수량 <input type="number" id="f-quantity" min="0" step="any" required /></label>
         <label>주가 <input type="number" id="f-price" min="0" step="any" required /></label>
         <label>그때 F&G 점수 (선택) <input type="number" id="f-fg" min="0" max="100" step="0.01" /></label>
+        <label>계좌 (선택)
+          <select id="f-account">
+            <option value="">선택 안 함</option>
+            <option value="키움 실전투자">키움 실전투자</option>
+            <option value="키움 모의투자">키움 모의투자</option>
+            <option value="KIS 모의투자">KIS 모의투자</option>
+            <option value="__custom__">기타 (직접입력)</option>
+          </select>
+        </label>
+        <label class="full" id="f-account-custom-wrap" hidden>계좌 직접입력 <input type="text" id="f-account-custom" /></label>
         <label class="full">메모 (선택) <textarea id="f-memo" rows="3"></textarea></label>
 
         <div class="form-actions">
