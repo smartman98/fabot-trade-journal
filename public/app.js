@@ -652,3 +652,8 @@ if (history.length > 0) renderFgAll("90");
 fetchTrades();
 fetchTodaySignal();
 fetchFgHistory();
+
+// fg-dashboard(smartman98.github.io/fg-dashboard)와 같은 주기(1분)로 화면을 자동 갱신한다 —
+// 안 그러면 페이지를 열어둔 채로 기다려도 값이 그대로라, 매번 새로고침해야 최신값이 보였다.
+setInterval(fetchTodaySignal, 60000);
+setInterval(fetchFgHistory, 60000);
