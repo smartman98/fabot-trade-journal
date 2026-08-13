@@ -48,3 +48,10 @@ alter table demo_balance add column if not exists broker text not null default '
 alter table demo_balance drop constraint if exists demo_balance_pkey;
 alter table demo_balance add primary key (broker, ticker);
 alter table demo_balance alter column broker drop default;
+
+-- 2026-08-14 추가: 배당 기록도 남길 수 있게 action에 'dividend' 허용 (모의투자
+-- 계좌는 실제 배당이 안 나오니 수동으로 넣을 수 있게 함). trades.action 체크 제약을
+-- 다시 만든다(같은 이름의 제약을 지우고 다시 만드는 방식 — Postgres는 check
+-- 제약에 직접 값 추가가 안 되고 통째로 다시 만들어야 함):
+alter table trades drop constraint if exists trades_action_check;
+alter table trades add constraint trades_action_check_v2 check (action in ('buy', 'sell', 'dividend'));
