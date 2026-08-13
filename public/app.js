@@ -644,3 +644,113 @@ fetchFgHistory();
 // 안 그러면 페이지를 열어둔 채로 기다려도 값이 그대로라, 매번 새로고침해야 최신값이 보였다.
 setInterval(fetchTodaySignal, 60000);
 setInterval(fetchFgHistory, 60000);
+
+// ---------- 계좌 잔고 (모의투자) ----------
+// push_demo_balance.py가 스케줄 실행마다(15:20/04:50) Supabase demo_balance 표에
+// 저장해두는 스냅샷을 그대로 읽어온다 — "새로고침"은 실시간으로 계좌를 다시 조회하는
+// 게 아니라, 마지막으로 저장된 스냅샷을 다시 받아오는 것이다(로컬 PC에서만 접근 가능한
+// 키움/KIS API를 이 배포된 웹서버가 직접 호출할 수는 없어서).
+
+let balanceRows = [];
+let balanceCurrency = "KRW";
+
+const balanceBody = document.getElementById("balance-body");
+const balanceSummaryBar = document.getElementById("balance-summary-bar");
+const balanceAsof = document.getElementById("balance-asof");
+const balanceCurrencyRow = document.getElementById("balance-currency-row");
+const balanceRefreshBtn = document.getElementById("balance-refresh-btn");
+
+function renderBalanceSummary(summary) {
+  balanceSummaryBar.innerHTML = "";
+  const profitCls = summary.krwProfit >= 0 ? "buy" : "sell"; // 기존 배색 재사용(빨강/파랑)
+  const items = [
+    { label: "총매입(원)", value: formatMoney(summary.krwAvgTotal), cls: "" },
+    { label: "총평가(원)", value: formatMoney(summary.krwCurrentTotal), cls: "" },
+    { label: "총수익(원)", value: formatMoney(summary.krwProfit), cls: profitCls },
+    { label: "총수익률", value: `${summary.krwProfitRate >= 0 ? "+" : ""}${summary.krwProfitRate.toFixed(2)}%`, cls: profitCls },
+  ];
+  for (const item of items) {
+    const chip = document.createElement("div");
+    chip.className = `summary-chip ${item.cls}`;
+    chip.innerHTML = `<div class="label">${item.label}</div><div class="value">${item.value}</div>`;
+    balanceSummaryBar.appendChild(chip);
+  }
+}
+
+function renderBalanceRows() {
+  balanceBody.innerHTML = "";
+  for (const r of balanceRows) {
+    const isKrwView = balanceCurrency === "KRW" || (balanceCurrency === "NATIVE" && r.currency === "KRW");
+    const nativeSymbol = r.currency === "USD" ? "$" : "";
+    let qty, avg, cur, pnl, rate;
+
+    if (isKrwView) {
+      qty = Number(r.quantity).toLocaleString("ko-KR");
+      avg = formatMoney(r.krw_avg_value / r.quantity);
+      cur = formatMoney(r.krw_current_value / r.quantity);
+      pnl = r.krw_current_value - r.krw_avg_value;
+      rate = r.krw_avg_value > 0 ? (pnl / r.krw_avg_value) * 100 : 0;
+      pnl = `${pnl >= 0 ? "+" : ""}${formatMoney(pnl)}`;
+    } else {
+      qty = Number(r.quantity).toLocaleString("ko-KR");
+      avg = `${nativeSymbol}${Number(r.avg_price).toLocaleString("ko-KR")}`;
+      cur = `${nativeSymbol}${Number(r.current_price).toLocaleString("ko-KR")}`;
+      const nativePnl = (r.current_price - r.avg_price) * r.quantity;
+      rate = r.avg_price > 0 ? ((r.current_price - r.avg_price) / r.avg_price) * 100 : 0;
+      const sign = nativePnl >= 0 ? "+" : "-";
+      pnl = `${sign}${nativeSymbol}${Math.abs(nativePnl).toLocaleString("ko-KR", { maximumFractionDigits: 2 })}`;
+    }
+
+    let krwHint = "";
+    if (balanceCurrency === "ALL" && r.currency === "USD") {
+      krwHint = ` <span class="muted">(${formatMoney(r.krw_current_value / r.quantity)}원)</span>`;
+    }
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${r.market === "domestic" ? "국내" : "해외"}</td>
+      <td>${r.label}</td>
+      <td>${qty}</td>
+      <td>${avg}</td>
+      <td>${cur}${krwHint}</td>
+      <td class="${rate >= 0 ? "pos" : "neg"}">${pnl}</td>
+      <td class="${rate >= 0 ? "pos" : "neg"}">${rate >= 0 ? "+" : ""}${rate.toFixed(2)}%</td>
+    `;
+    balanceBody.appendChild(tr);
+  }
+}
+
+async function fetchBalance() {
+  try {
+    const res = await fetch("/api/balance", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    balanceRows = data.rows;
+    renderBalanceSummary(data.summary);
+    renderBalanceRows();
+    const latest = balanceRows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), "");
+    if (latest) {
+      const when = new Date(latest);
+      balanceAsof.textContent = `${when.toLocaleString("ko-KR")} 기준 스냅샷 — 스케줄 실행 때마다 갱신됨`;
+    }
+  } catch {
+    // 조용히 넘어감 — 매매 기록 등 다른 화면은 정상 동작해야 하므로.
+  }
+}
+
+if (balanceCurrencyRow) {
+  balanceCurrencyRow.addEventListener("click", (e) => {
+    const btn = e.target.closest(".filter-btn");
+    if (!btn) return;
+    balanceCurrencyRow.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    balanceCurrency = btn.dataset.currency;
+    renderBalanceRows();
+  });
+}
+
+if (balanceRefreshBtn) {
+  balanceRefreshBtn.addEventListener("click", fetchBalance);
+}
+
+fetchBalance();
