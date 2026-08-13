@@ -42,6 +42,7 @@
 
     <!-- 계좌 잔고 (모의투자) -->
     <section id="balance-section">
+      <button id="add-dividend-btn" class="primary-btn">+ 배당 기록 추가</button>
       <div id="balance-sections"></div>
     </section>
 
@@ -67,10 +68,11 @@
           <select id="f-action" required>
             <option value="buy">매수</option>
             <option value="sell">매도</option>
+            <option value="dividend">배당</option>
           </select>
         </label>
-        <label>수량 <input type="number" id="f-quantity" min="0" step="any" required /></label>
-        <label>주가 <input type="number" id="f-price" min="0" step="any" required /></label>
+        <label id="f-quantity-label">수량 <input type="number" id="f-quantity" min="0" step="any" required /></label>
+        <label id="f-price-label">주가 <input type="number" id="f-price" min="0" step="any" required /></label>
         <label>그때 F&G 점수 (선택) <input type="number" id="f-fg" min="0" max="100" step="0.01" /></label>
         <label>계좌 (선택)
           <select id="f-account">

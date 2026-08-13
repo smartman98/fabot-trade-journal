@@ -168,13 +168,16 @@ app.get("/api/trades", async (req, res) => {
       if (t.action === "buy") {
         acc.buyCount += 1;
         acc.buyTotal += Number(t.quantity) * Number(t.price);
-      } else {
+      } else if (t.action === "sell") {
         acc.sellCount += 1;
         acc.sellTotal += Number(t.quantity) * Number(t.price);
+      } else if (t.action === "dividend") {
+        acc.dividendCount += 1;
+        acc.dividendTotal += Number(t.price);
       }
       return acc;
     },
-    { buyCount: 0, sellCount: 0, buyTotal: 0, sellTotal: 0 }
+    { buyCount: 0, sellCount: 0, buyTotal: 0, sellTotal: 0, dividendCount: 0, dividendTotal: 0 }
   );
 
   res.json({ trades: data, summary });

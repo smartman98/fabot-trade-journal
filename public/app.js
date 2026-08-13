@@ -71,6 +71,12 @@ function formatMoney(n) {
   return Math.round(n).toLocaleString("ko-KR");
 }
 
+function actionLabel(action) {
+  if (action === "buy") return "매수";
+  if (action === "sell") return "매도";
+  return "배당";
+}
+
 function renderTrades(trades, targetUl) {
   targetUl.innerHTML = "";
   if (trades.length === 0) {
@@ -88,7 +94,7 @@ function renderTrades(trades, targetUl) {
 
     const badge = document.createElement("span");
     badge.className = `action-badge ${t.action}`;
-    badge.textContent = t.action === "buy" ? "매수" : "매도";
+    badge.textContent = actionLabel(t.action);
 
     const main = document.createElement("div");
     main.className = "trade-main";
@@ -98,7 +104,9 @@ function renderTrades(trades, targetUl) {
     const meta = document.createElement("div");
     meta.className = "trade-meta";
     const fgText = t.fg_score !== null && t.fg_score !== undefined ? ` · F&G ${t.fg_score}` : "";
-    meta.textContent = `${t.trade_date} · 수량 ${t.quantity} · 주가 ${formatMoney(t.price)}${fgText}`;
+    meta.textContent = t.action === "dividend"
+      ? `${t.trade_date} · 세후 수령액 ${formatMoney(t.price)}원${fgText}`
+      : `${t.trade_date} · 수량 ${t.quantity} · 주가 ${formatMoney(t.price)}${fgText}`;
 
     main.appendChild(ticker);
     main.appendChild(meta);
@@ -133,6 +141,32 @@ async function fetchTrades() {
   if (Object.keys(balanceData).length > 0) renderAllBalanceSections();
 }
 
+const fQuantityLabel = document.getElementById("f-quantity-label");
+const fPriceLabel = document.getElementById("f-price-label");
+const addDividendBtn = document.getElementById("add-dividend-btn");
+
+function updateFormLabelsForAction() {
+  const isDividend = fAction.value === "dividend";
+  fQuantityLabel.firstChild.textContent = isDividend ? "수량(배당은 1로 고정) " : "수량 ";
+  fPriceLabel.firstChild.textContent = isDividend ? "세후 수령액 " : "주가 ";
+  if (isDividend) fQuantity.value = 1;
+}
+fAction.addEventListener("change", updateFormLabelsForAction);
+
+function openAddDividendForm() {
+  editingId = null;
+  formTitle.textContent = "배당 기록 추가";
+  tradeForm.reset();
+  fDate.value = new Date().toISOString().slice(0, 10);
+  fAction.value = "dividend";
+  fQuantity.value = 1;
+  setAccountValue(null);
+  formError.textContent = "";
+  updateFormLabelsForAction();
+  showView("form");
+}
+addDividendBtn.addEventListener("click", openAddDividendForm);
+
 function openEditForm(trade) {
   editingId = trade.id;
   formTitle.textContent = "매매 기록 수정";
@@ -145,6 +179,7 @@ function openEditForm(trade) {
   setAccountValue(trade.account ?? null);
   fMemo.value = trade.memo ?? "";
   formError.textContent = "";
+  updateFormLabelsForAction();
   showView("form");
 }
 
@@ -152,7 +187,7 @@ function openDetail(trade) {
   selectedTrade = trade;
   const fgText = trade.fg_score !== null && trade.fg_score !== undefined ? trade.fg_score : "-";
   detailBody.innerHTML = `
-    <div><strong>${trade.ticker}</strong> (${trade.action === "buy" ? "매수" : "매도"})</div>
+    <div><strong>${trade.ticker}</strong> (${actionLabel(trade.action)})</div>
     <div>날짜: ${trade.trade_date}</div>
     <div>수량: ${trade.quantity}</div>
     <div>주가: ${formatMoney(trade.price)}</div>

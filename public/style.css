@@ -342,6 +342,11 @@ svg.fg-chart {
   color: var(--diverge-blue);
 }
 
+.action-badge.dividend {
+  background: var(--cat-2);
+  color: #fff;
+}
+
 .trade-main {
   flex: 1;
   min-width: 0;
