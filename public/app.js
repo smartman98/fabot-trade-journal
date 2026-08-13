@@ -11,7 +11,6 @@ const summaryBar = document.getElementById("summary-bar");
 const tradeList = document.getElementById("trade-list");
 const loadingEl = document.getElementById("loading");
 
-const addBtn = document.getElementById("add-btn");
 const cancelBtn = document.getElementById("cancel-btn");
 const tradeForm = document.getElementById("trade-form");
 const formTitle = document.getElementById("form-title");
@@ -136,17 +135,6 @@ async function fetchTrades() {
   renderTrades(data.trades);
 }
 
-function openAddForm() {
-  editingId = null;
-  formTitle.textContent = "새 매매 기록";
-  tradeForm.reset();
-  fDate.value = new Date().toISOString().slice(0, 10);
-  if (todaySignal) fFg.value = todaySignal.score;
-  setAccountValue(null);
-  formError.textContent = "";
-  showView("form");
-}
-
 function openEditForm(trade) {
   editingId = trade.id;
   formTitle.textContent = "매매 기록 수정";
@@ -211,7 +199,6 @@ tradeForm.addEventListener("submit", async (e) => {
   showView("list");
 });
 
-addBtn.addEventListener("click", openAddForm);
 cancelBtn.addEventListener("click", () => showView("list"));
 
 detailEditBtn.addEventListener("click", () => openEditForm(selectedTrade));
