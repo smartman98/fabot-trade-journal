@@ -109,12 +109,44 @@ function renderTrades(trades) {
   }
 }
 
+let allTrades = [];
+let accountFilter = "ALL";
+const accountFilterRow = document.getElementById("account-filter-row");
+
+function renderAccountFilterRow() {
+  const accounts = Array.from(new Set(allTrades.map((t) => t.account).filter(Boolean)));
+  accountFilterRow.innerHTML = "";
+  const tabs = [{ key: "ALL", label: "전체" }, ...accounts.map((a) => ({ key: a, label: a }))];
+  for (const tab of tabs) {
+    const btn = document.createElement("button");
+    btn.className = "filter-btn" + (tab.key === accountFilter ? " active" : "");
+    btn.textContent = tab.label;
+    btn.dataset.account = tab.key;
+    accountFilterRow.appendChild(btn);
+  }
+}
+
+function applyAccountFilterAndRender() {
+  const filtered = accountFilter === "ALL" ? allTrades : allTrades.filter((t) => t.account === accountFilter);
+  renderTrades(filtered);
+}
+
+accountFilterRow.addEventListener("click", (e) => {
+  const btn = e.target.closest(".filter-btn");
+  if (!btn) return;
+  accountFilter = btn.dataset.account;
+  renderAccountFilterRow();
+  applyAccountFilterAndRender();
+});
+
 async function fetchTrades() {
   loadingEl.hidden = false;
   const res = await fetch(API);
   const data = await res.json();
   loadingEl.hidden = true;
-  renderTrades(data.trades);
+  allTrades = data.trades;
+  renderAccountFilterRow();
+  applyAccountFilterAndRender();
 }
 
 function openEditForm(trade) {
