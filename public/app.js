@@ -633,36 +633,23 @@ setInterval(fetchFgHistory, 60000);
 // 게 아니라, 마지막으로 저장된 스냅샷을 다시 받아오는 것이다(로컬 PC에서만 접근 가능한
 // 키움/KIS API를 이 배포된 웹서버가 직접 호출할 수는 없어서).
 
-let balanceRows = [];
-let balanceCurrency = "KRW";
+// 증권사별로 완전히 별개 계좌라(KIS 모의투자 / 키움증권 모의투자) 화면도 따로 그린다
+// (2026-08-14: 두 계좌가 우연히 같은 종목 472150을 동시에 보유하고 있어서, 하나로
+// 합쳐 보여주면 "어느 계좌 건지" 헷갈린다는 걸 사용자가 실제 키움 HTS 화면과 대조
+// 하다가 확인함).
 
-const balanceBody = document.getElementById("balance-body");
-const balanceSummaryBar = document.getElementById("balance-summary-bar");
-const balanceAsof = document.getElementById("balance-asof");
-const balanceCurrencyRow = document.getElementById("balance-currency-row");
-const balanceRefreshBtn = document.getElementById("balance-refresh-btn");
+const BROKER_LABELS = { KIS: "한국투자증권 모의계좌", Kiwoom: "키움증권 모의계좌" };
+const balanceSectionsEl = document.getElementById("balance-sections");
+let balanceData = {}; // { KIS: {rows, summary}, Kiwoom: {rows, summary} }
+const balanceCurrencyByBroker = {}; // broker -> "KRW" | "NATIVE" | "ALL"
 
-function renderBalanceSummary(summary) {
-  balanceSummaryBar.innerHTML = "";
-  const profitCls = summary.krwProfit >= 0 ? "buy" : "sell"; // 기존 배색 재사용(빨강/파랑)
-  const items = [
-    { label: "총매입(원)", value: formatMoney(summary.krwAvgTotal), cls: "" },
-    { label: "총평가(원)", value: formatMoney(summary.krwCurrentTotal), cls: "" },
-    { label: "총수익(원)", value: formatMoney(summary.krwProfit), cls: profitCls },
-    { label: "총수익률", value: `${summary.krwProfitRate >= 0 ? "+" : ""}${summary.krwProfitRate.toFixed(2)}%`, cls: profitCls },
-  ];
-  for (const item of items) {
-    const chip = document.createElement("div");
-    chip.className = `summary-chip ${item.cls}`;
-    chip.innerHTML = `<div class="label">${item.label}</div><div class="value">${item.value}</div>`;
-    balanceSummaryBar.appendChild(chip);
-  }
-}
-
-function renderBalanceRows() {
-  balanceBody.innerHTML = "";
-  for (const r of balanceRows) {
-    const isKrwView = balanceCurrency === "KRW" || (balanceCurrency === "NATIVE" && r.currency === "KRW");
+function renderBalanceRowsFor(broker) {
+  const tbody = document.getElementById(`balance-body-${broker}`);
+  if (!tbody) return;
+  const currency = balanceCurrencyByBroker[broker] || "KRW";
+  tbody.innerHTML = "";
+  for (const r of balanceData[broker].rows) {
+    const isKrwView = currency === "KRW" || (currency === "NATIVE" && r.currency === "KRW");
     const nativeSymbol = r.currency === "USD" ? "$" : "";
     let qty, avg, cur, pnl, rate;
 
@@ -684,7 +671,7 @@ function renderBalanceRows() {
     }
 
     let krwHint = "";
-    if (balanceCurrency === "ALL" && r.currency === "USD") {
+    if (currency === "ALL" && r.currency === "USD") {
       krwHint = ` <span class="muted">(${formatMoney(r.krw_current_value / r.quantity)}원)</span>`;
     }
 
@@ -698,7 +685,51 @@ function renderBalanceRows() {
       <td class="${rate >= 0 ? "pos" : "neg"}">${pnl}</td>
       <td class="${rate >= 0 ? "pos" : "neg"}">${rate >= 0 ? "+" : ""}${rate.toFixed(2)}%</td>
     `;
-    balanceBody.appendChild(tr);
+    tbody.appendChild(tr);
+  }
+}
+
+function renderBalanceSection(broker) {
+  const { rows, summary } = balanceData[broker];
+  const profitCls = summary.krwProfit >= 0 ? "buy" : "sell";
+  const latest = rows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), "");
+  const asofText = latest
+    ? `${new Date(latest).toLocaleString("ko-KR")} 기준 스냅샷 — 스케줄 실행 때마다 갱신됨`
+    : "";
+
+  const section = document.createElement("div");
+  section.className = "balance-broker-block";
+  section.innerHTML = `
+    <h3>계좌 잔고 (${BROKER_LABELS[broker] || broker})</h3>
+    <p class="sub">해외 종목 표시통화</p>
+    <div class="filter-row balance-currency-row" data-broker="${broker}">
+      <button class="filter-btn active" data-currency="KRW">원화</button>
+      <button class="filter-btn" data-currency="NATIVE">외화</button>
+      <button class="filter-btn" data-currency="ALL">모두</button>
+    </div>
+    <button class="ghost-btn balance-refresh-btn" data-broker="${broker}">잔고 새로고침</button>
+    <div class="summary-bar">
+      <div class="summary-chip"><div class="label">총매입(원)</div><div class="value">${formatMoney(summary.krwAvgTotal)}</div></div>
+      <div class="summary-chip"><div class="label">총평가(원)</div><div class="value">${formatMoney(summary.krwCurrentTotal)}</div></div>
+      <div class="summary-chip ${profitCls}"><div class="label">총수익(원)</div><div class="value">${formatMoney(summary.krwProfit)}</div></div>
+      <div class="summary-chip ${profitCls}"><div class="label">총수익률</div><div class="value">${summary.krwProfitRate >= 0 ? "+" : ""}${summary.krwProfitRate.toFixed(2)}%</div></div>
+    </div>
+    <div class="table-wrap">
+      <table class="balance-table">
+        <thead><tr><th>시장</th><th>종목명</th><th>보유량</th><th>매입가</th><th>현재가</th><th>평가손익</th><th>수익률</th></tr></thead>
+        <tbody id="balance-body-${broker}"></tbody>
+      </table>
+    </div>
+    <p class="sub balance-asof">${asofText}</p>
+  `;
+  balanceSectionsEl.appendChild(section);
+  renderBalanceRowsFor(broker);
+}
+
+function renderAllBalanceSections() {
+  balanceSectionsEl.innerHTML = "";
+  for (const broker of Object.keys(balanceData)) {
+    renderBalanceSection(broker);
   }
 }
 
@@ -706,33 +737,26 @@ async function fetchBalance() {
   try {
     const res = await fetch("/api/balance", { cache: "no-store" });
     if (!res.ok) return;
-    const data = await res.json();
-    balanceRows = data.rows;
-    renderBalanceSummary(data.summary);
-    renderBalanceRows();
-    const latest = balanceRows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), "");
-    if (latest) {
-      const when = new Date(latest);
-      balanceAsof.textContent = `${when.toLocaleString("ko-KR")} 기준 스냅샷 — 스케줄 실행 때마다 갱신됨`;
-    }
+    balanceData = await res.json();
+    renderAllBalanceSections();
   } catch {
     // 조용히 넘어감 — 매매 기록 등 다른 화면은 정상 동작해야 하므로.
   }
 }
 
-if (balanceCurrencyRow) {
-  balanceCurrencyRow.addEventListener("click", (e) => {
-    const btn = e.target.closest(".filter-btn");
-    if (!btn) return;
-    balanceCurrencyRow.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
-    btn.classList.add("active");
-    balanceCurrency = btn.dataset.currency;
-    renderBalanceRows();
-  });
-}
-
-if (balanceRefreshBtn) {
-  balanceRefreshBtn.addEventListener("click", fetchBalance);
-}
+balanceSectionsEl.addEventListener("click", (e) => {
+  const currencyBtn = e.target.closest(".balance-currency-row .filter-btn");
+  if (currencyBtn) {
+    const row = currencyBtn.closest(".balance-currency-row");
+    const broker = row.dataset.broker;
+    row.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+    currencyBtn.classList.add("active");
+    balanceCurrencyByBroker[broker] = currencyBtn.dataset.currency;
+    renderBalanceRowsFor(broker);
+    return;
+  }
+  const refreshBtn = e.target.closest(".balance-refresh-btn");
+  if (refreshBtn) fetchBalance();
+});
 
 fetchBalance();

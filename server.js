@@ -119,12 +119,11 @@ app.get("/api/signal/history", async (req, res) => {
   res.json(series);
 });
 
-// 모의투자 계좌 잔고 (push_demo_balance.py가 스케줄 실행마다 upsert해두는 스냅샷을 그대로 읽음)
-app.get("/api/balance", async (req, res) => {
-  const { data, error } = await supabase.from("demo_balance").select("*").order("market", { ascending: true });
-  if (error) return res.status(500).json({ error: error.message });
-
-  const summary = data.reduce(
+// 모의투자 계좌 잔고 — 증권사별로 완전히 별개인 계좌라 broker별로 묶어서 반환한다
+// (push_demo_balance.py가 KIS, push_demo_balance_kiwoom.py가 Kiwoom을 각각 스케줄
+// 실행마다 upsert해두는 스냅샷을 그대로 읽음).
+function summarize(rows) {
+  const summary = rows.reduce(
     (acc, r) => {
       acc.krwAvgTotal += Number(r.krw_avg_value);
       acc.krwCurrentTotal += Number(r.krw_current_value);
@@ -134,8 +133,24 @@ app.get("/api/balance", async (req, res) => {
   );
   summary.krwProfit = summary.krwCurrentTotal - summary.krwAvgTotal;
   summary.krwProfitRate = summary.krwAvgTotal > 0 ? (summary.krwProfit / summary.krwAvgTotal) * 100 : 0;
+  return summary;
+}
 
-  res.json({ rows: data, summary });
+app.get("/api/balance", async (req, res) => {
+  const { data, error } = await supabase.from("demo_balance").select("*").order("market", { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const brokers = {};
+  for (const row of data) {
+    if (!brokers[row.broker]) brokers[row.broker] = [];
+    brokers[row.broker].push(row);
+  }
+
+  const result = {};
+  for (const [broker, rows] of Object.entries(brokers)) {
+    result[broker] = { rows, summary: summarize(rows) };
+  }
+  res.json(result);
 });
 
 // 목록 조회 + 요약 통계
