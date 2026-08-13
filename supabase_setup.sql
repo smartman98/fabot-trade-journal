@@ -39,3 +39,12 @@ create table demo_balance (
 
 alter table demo_balance enable row level security;
 revoke all on demo_balance from anon;
+
+-- 2026-08-14 추가: 증권사(한국투자증권 KIS / 키움증권)별로 완전히 별개인 모의투자
+-- 계좌를 둘 다 보여주기로 함 — 두 계좌가 같은 종목(472150)을 동시에 들고 있을 수
+-- 있어서 ticker 하나만으로는 primary key가 안 됨. (broker, ticker) 복합키로 바꾼다.
+-- 기존 테이블에 이미 데이터가 있는 상태에서 Supabase SQL Editor에서 실행:
+alter table demo_balance add column if not exists broker text not null default 'KIS';
+alter table demo_balance drop constraint if exists demo_balance_pkey;
+alter table demo_balance add primary key (broker, ticker);
+alter table demo_balance alter column broker drop default;
