@@ -7,7 +7,6 @@ const listView = document.getElementById("list-view");
 const formView = document.getElementById("form-view");
 const detailView = document.getElementById("detail-view");
 
-const summaryBar = document.getElementById("summary-bar");
 const tradeList = document.getElementById("trade-list");
 const loadingEl = document.getElementById("loading");
 
@@ -72,22 +71,6 @@ function formatMoney(n) {
   return Math.round(n).toLocaleString("ko-KR");
 }
 
-function renderSummary(summary) {
-  summaryBar.innerHTML = "";
-  const items = [
-    { label: "총 매수", value: `${summary.buyCount}건`, cls: "buy" },
-    { label: "총 매수금액", value: `${formatMoney(summary.buyTotal)}`, cls: "buy" },
-    { label: "총 매도", value: `${summary.sellCount}건`, cls: "sell" },
-    { label: "총 매도금액", value: `${formatMoney(summary.sellTotal)}`, cls: "sell" },
-  ];
-  for (const item of items) {
-    const chip = document.createElement("div");
-    chip.className = `summary-chip ${item.cls}`;
-    chip.innerHTML = `<div class="label">${item.label}</div><div class="value">${item.value}</div>`;
-    summaryBar.appendChild(chip);
-  }
-}
-
 function renderTrades(trades) {
   tradeList.innerHTML = "";
   if (trades.length === 0) {
@@ -131,7 +114,6 @@ async function fetchTrades() {
   const res = await fetch(API);
   const data = await res.json();
   loadingEl.hidden = true;
-  renderSummary(data.summary);
   renderTrades(data.trades);
 }
 
