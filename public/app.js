@@ -401,7 +401,11 @@ async function fetchTodaySignal() {
 // ---------- F&G 지수 추이 차트 (fg-dashboard와 동일한 구현) ----------
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-const history = typeof FG_DATA !== "undefined" ? FG_DATA.history : [];
+// fg_data.js는 2026-07-22에 한 번 만들어진 정적 스냅샷이라 시간이 지날수록 오래된 값으로
+// 굳어있다(2026-08-13 실측: "오늘의 신호"는 62인데 이 정적 스냅샷의 마지막 값은 7월 중순
+// 41.7로 3주 넘게 멈춰있었음). 화면이 바로 뜨도록 정적 스냅샷을 먼저 보여주고, 뒤이어
+// /api/signal/history(실시간 Supabase 조회)로 교체한다.
+let history = typeof FG_DATA !== "undefined" ? FG_DATA.history : [];
 
 function filterRange(rangeKey) {
   if (rangeKey === "all") return history;
@@ -625,7 +629,26 @@ if (tableToggleBtn) {
   });
 }
 
+function currentActiveRange() {
+  const activeBtn = filterRow && filterRow.querySelector(".filter-btn.active");
+  return activeBtn ? activeBtn.dataset.range : "90";
+}
+
+async function fetchFgHistory() {
+  try {
+    const res = await fetch("/api/signal/history", { cache: "no-store" });
+    if (!res.ok) return;
+    const live = await res.json();
+    if (live.length === 0) return;
+    history = live;
+    renderFgAll(currentActiveRange());
+  } catch {
+    // 실패해도 정적 스냅샷이 이미 화면에 떠 있으니 조용히 넘어간다.
+  }
+}
+
 if (history.length > 0) renderFgAll("90");
 
 fetchTrades();
 fetchTodaySignal();
+fetchFgHistory();

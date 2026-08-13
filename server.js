@@ -79,22 +79,43 @@ app.get("/api/signal/today", async (req, res) => {
   });
 });
 
-// F&G 추이 (최근 90개, 하루에 여러 번 계산됐으면 그날의 마지막 값만 사용)
+// F&G 추이 (최근 90일, 하루에 여러 번 계산됐으면 그날의 마지막 값만 사용)
+//
+// cnn_real은 값이 안 바뀌어도 크론이 돌 때마다 매번 새로 한 행씩 쌓인다(하루 수백~수천 건).
+// 예전엔 "오래된 순으로 5000개"를 가져왔는데, 쌓인 행이 5000개보다 훨씬 많아지면서
+// 5000번째 행이 몇 주 전 데이터에 그쳐 최근 날짜가 아예 안 잡히는 버그가 있었다
+// (2026-08-13 실측: "오늘의 신호"는 62인데 추이 차트 마지막 점은 7월 말 41.7로 따로 놈).
+// 최근 순으로 페이지네이션하면서 날짜 90개가 모일 때까지만 받아오면, 쌓인 행 개수와
+// 상관없이 항상 최근 90일을 정확히 잡는다.
 app.get("/api/signal/history", async (req, res) => {
-  const { data, error } = await supabase
-    .from("live_scores")
-    .select("score, computed_at")
-    .eq("source", "cnn_real")
-    .order("computed_at", { ascending: true })
-    .limit(5000);
+  const TARGET_DAYS = 90;
+  const PAGE_SIZE = 1000;
 
-  if (error) return res.status(500).json({ error: error.message });
+  const byDate = new Map(); // date -> score (최근 순으로 훑으므로 그 날짜의 첫 값 = 가장 최신 값)
+  let offset = 0;
+  for (let page = 0; page < 50; page += 1) { // 안전장치: 최대 5만 행까지만
+    const { data, error } = await supabase
+      .from("live_scores")
+      .select("score, computed_at")
+      .eq("source", "cnn_real")
+      .order("computed_at", { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
 
-  const byDate = new Map();
-  for (const row of data) {
-    byDate.set(row.computed_at.slice(0, 10), row.score);
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data || data.length === 0) break;
+
+    for (const row of data) {
+      const dateStr = row.computed_at.slice(0, 10);
+      if (!byDate.has(dateStr)) byDate.set(dateStr, row.score);
+    }
+
+    if (byDate.size >= TARGET_DAYS || data.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
   }
-  const series = Array.from(byDate, ([date, score]) => ({ date, score })).slice(-90);
+
+  const series = Array.from(byDate, ([date, score]) => ({ date, score }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-TARGET_DAYS);
   res.json(series);
 });
 
