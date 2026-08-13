@@ -71,13 +71,13 @@ function formatMoney(n) {
   return Math.round(n).toLocaleString("ko-KR");
 }
 
-function renderTrades(trades) {
-  tradeList.innerHTML = "";
+function renderTrades(trades, targetUl) {
+  targetUl.innerHTML = "";
   if (trades.length === 0) {
     const empty = document.createElement("li");
     empty.className = "empty-state";
     empty.textContent = "아직 매매 기록이 없습니다.";
-    tradeList.appendChild(empty);
+    targetUl.appendChild(empty);
     return;
   }
 
@@ -98,46 +98,30 @@ function renderTrades(trades) {
     const meta = document.createElement("div");
     meta.className = "trade-meta";
     const fgText = t.fg_score !== null && t.fg_score !== undefined ? ` · F&G ${t.fg_score}` : "";
-    const accountText = t.account ? ` · ${t.account}` : "";
-    meta.textContent = `${t.trade_date} · 수량 ${t.quantity} · 주가 ${formatMoney(t.price)}${fgText}${accountText}`;
+    meta.textContent = `${t.trade_date} · 수량 ${t.quantity} · 주가 ${formatMoney(t.price)}${fgText}`;
 
     main.appendChild(ticker);
     main.appendChild(meta);
     li.appendChild(badge);
     li.appendChild(main);
-    tradeList.appendChild(li);
+    targetUl.appendChild(li);
   }
 }
+
+// 계좌(broker)별로 잔고 블록 안에 그 계좌 매매기록을 같이 넣는다(2026-08-14, 사용자가
+// "계좌잔고(한국투자증권) 안에 매매기록(한국투자증권)이 같이 있어야 한다"고 요청) —
+// account 필드 문자열(로그에 실제 찍히는 값)과 화면 라벨(BROKER_LABELS)이 서로 달라서
+// 매핑 테이블이 필요하다.
+const BROKER_ACCOUNT_TAG = { KIS: "KIS 모의투자", Kiwoom: "키움 모의투자" };
 
 let allTrades = [];
-let accountFilter = "ALL";
-const accountFilterRow = document.getElementById("account-filter-row");
 
-function renderAccountFilterRow() {
-  const accounts = Array.from(new Set(allTrades.map((t) => t.account).filter(Boolean)));
-  accountFilterRow.innerHTML = "";
-  const tabs = [{ key: "ALL", label: "전체" }, ...accounts.map((a) => ({ key: a, label: a }))];
-  for (const tab of tabs) {
-    const btn = document.createElement("button");
-    btn.className = "filter-btn" + (tab.key === accountFilter ? " active" : "");
-    btn.textContent = tab.label;
-    btn.dataset.account = tab.key;
-    accountFilterRow.appendChild(btn);
-  }
+function renderOrphanTrades() {
+  const known = Object.values(BROKER_ACCOUNT_TAG);
+  const orphans = allTrades.filter((t) => !known.includes(t.account));
+  listView.hidden = orphans.length === 0;
+  if (orphans.length > 0) renderTrades(orphans, tradeList);
 }
-
-function applyAccountFilterAndRender() {
-  const filtered = accountFilter === "ALL" ? allTrades : allTrades.filter((t) => t.account === accountFilter);
-  renderTrades(filtered);
-}
-
-accountFilterRow.addEventListener("click", (e) => {
-  const btn = e.target.closest(".filter-btn");
-  if (!btn) return;
-  accountFilter = btn.dataset.account;
-  renderAccountFilterRow();
-  applyAccountFilterAndRender();
-});
 
 async function fetchTrades() {
   loadingEl.hidden = false;
@@ -145,8 +129,8 @@ async function fetchTrades() {
   const data = await res.json();
   loadingEl.hidden = true;
   allTrades = data.trades;
-  renderAccountFilterRow();
-  applyAccountFilterAndRender();
+  renderOrphanTrades();
+  if (Object.keys(balanceData).length > 0) renderAllBalanceSections();
 }
 
 function openEditForm(trade) {
@@ -753,9 +737,14 @@ function renderBalanceSection(broker) {
       </table>
     </div>
     <p class="sub balance-asof">${asofText}</p>
+    <h4>매매기록 (${BROKER_LABELS[broker] || broker})</h4>
+    <ul class="trade-list" id="trade-list-${broker}"></ul>
   `;
   balanceSectionsEl.appendChild(section);
   renderBalanceRowsFor(broker);
+
+  const tradesForBroker = allTrades.filter((t) => t.account === BROKER_ACCOUNT_TAG[broker]);
+  renderTrades(tradesForBroker, document.getElementById(`trade-list-${broker}`));
 }
 
 function renderAllBalanceSections() {
@@ -771,6 +760,7 @@ async function fetchBalance() {
     if (!res.ok) return;
     balanceData = await res.json();
     renderAllBalanceSections();
+    renderOrphanTrades();
   } catch {
     // 조용히 넘어감 — 매매 기록 등 다른 화면은 정상 동작해야 하므로.
   }

@@ -47,12 +47,12 @@
 
     <hr class="section-divider" />
 
-    <!-- 목록 화면 -->
-    <section id="list-view">
+    <!-- 목록 화면: 계좌에 안 묶인(기타) 매매기록만 여기 남는다. 계좌별 매매기록은
+         계좌 잔고 블록 안에 같이 나온다. -->
+    <section id="list-view" hidden>
       <div class="list-header">
-        <h2>매매 기록</h2>
+        <h2>매매 기록 (기타 계좌)</h2>
       </div>
-      <div class="filter-row" id="account-filter-row"></div>
       <div id="loading" class="muted">불러오는 중…</div>
       <ul id="trade-list" class="trade-list"></ul>
     </section>
