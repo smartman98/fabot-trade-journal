@@ -55,3 +55,21 @@ alter table demo_balance alter column broker drop default;
 -- 제약에 직접 값 추가가 안 되고 통째로 다시 만들어야 함):
 alter table trades drop constraint if exists trades_action_check;
 alter table trades add constraint trades_action_check_v2 check (action in ('buy', 'sell', 'dividend'));
+
+-- 2026-08-14 추가: 계좌별 일별(종가 기준) 수익/수익률 히스토리. demo_balance는 "지금"
+-- 스냅샷 1개만 upsert하지만, 이 표는 하루 1건씩 쌓아서 그래프를 그릴 수 있게 한다.
+-- push_demo_balance.py/push_demo_balance_kiwoom.py가 각자 계좌 시장 마감 직전
+-- 시간대에만(하루 1번) 이 표에 insert한다.
+create table balance_history (
+  broker text not null,
+  snapshot_date date not null,
+  krw_avg_total numeric not null,
+  krw_current_total numeric not null,
+  krw_profit numeric not null,
+  krw_profit_rate numeric not null,
+  created_at timestamptz not null default now(),
+  primary key (broker, snapshot_date)
+);
+
+alter table balance_history enable row level security;
+revoke all on balance_history from anon;
