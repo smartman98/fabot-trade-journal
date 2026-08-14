@@ -203,6 +203,14 @@ svg.fg-chart {
 .balance-broker-block:last-child { border-bottom: none; }
 .balance-broker-block h3 { margin-bottom: 4px; }
 
+.balance-chart-wrap {
+  background: var(--diverge-neutral);
+  border-radius: 14px;
+  padding: 12px;
+  margin: 10px 0 16px;
+}
+.balance-chart-wrap svg { width: 100%; height: auto; overflow: visible; }
+
 .table-wrap table {
   width: 100%;
   border-collapse: collapse;

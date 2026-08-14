@@ -679,6 +679,75 @@ const balanceSectionsEl = document.getElementById("balance-sections");
 let balanceData = {}; // { KIS: {rows, summary}, Kiwoom: {rows, summary} }
 const balanceCurrencyByBroker = {}; // broker -> "KRW" | "NATIVE" | "ALL"
 
+let balanceHistoryData = {}; // { KIS: [{snapshot_date, krw_profit, krw_profit_rate, ...}], Kiwoom: [...] }
+const balanceMetricByBroker = {}; // broker -> "rate" | "profit"
+
+// 값 배열을 간단한 SVG 꺾은선 그래프로 그린다(F&G 차트처럼 0~100 고정범위가 아니라
+// 데이터 최소/최대에 맞춰 자동으로 축을 잡아야 해서 별도로 만듦 — 음수(손실)도 나올 수 있음).
+function buildMiniLineChartSvg(points) {
+  const W = 640, H = 200, PAD = { top: 14, right: 12, bottom: 20, left: 46 };
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+
+  if (points.length === 0) {
+    return `<svg viewBox="0 0 ${W} ${H}"><text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="var(--text-muted)" font-size="13">아직 쌓인 데이터가 없습니다(장 마감 무렵부터 하루 1건씩 쌓입니다)</text></svg>`;
+  }
+
+  const values = points.map((p) => p.value);
+  let min = Math.min(...values, 0);
+  let max = Math.max(...values, 0);
+  if (min === max) { min -= 1; max += 1; }
+  const span = max - min;
+  min -= span * 0.1;
+  max += span * 0.1;
+
+  const x = (i) => (points.length <= 1 ? PAD.left : PAD.left + (i / (points.length - 1)) * plotW);
+  const y = (v) => PAD.top + (1 - (v - min) / (max - min)) * plotH;
+
+  const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
+  const zeroY = y(0).toFixed(1);
+
+  const dots = points
+    .map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3" fill="${p.value >= 0 ? "var(--diverge-red)" : "var(--diverge-blue)"}" />`)
+    .join("");
+
+  const firstLabel = points[0].label;
+  const lastLabel = points[points.length - 1].label;
+
+  return `
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="일별 수익 추이 차트">
+      <line x1="${PAD.left}" y1="${zeroY}" x2="${W - PAD.right}" y2="${zeroY}" stroke="var(--baseline)" stroke-dasharray="3,3" />
+      <path d="${path}" fill="none" stroke="var(--cat-2)" stroke-width="2" />
+      ${dots}
+      <text x="${PAD.left}" y="${H - 4}" font-size="11" fill="var(--text-muted)">${firstLabel}</text>
+      <text x="${W - PAD.right}" y="${H - 4}" font-size="11" fill="var(--text-muted)" text-anchor="end">${lastLabel}</text>
+    </svg>
+  `;
+}
+
+function renderBalanceChart(broker) {
+  const wrap = document.getElementById(`balance-chart-${broker}`);
+  if (!wrap) return;
+  const metric = balanceMetricByBroker[broker] || "rate";
+  const history = balanceHistoryData[broker] || [];
+  const points = history.map((h) => ({
+    label: h.snapshot_date.slice(5), // MM-DD만
+    value: metric === "rate" ? Number(h.krw_profit_rate) : Number(h.krw_profit),
+  }));
+  wrap.innerHTML = buildMiniLineChartSvg(points);
+}
+
+async function fetchBalanceHistory() {
+  try {
+    const res = await fetch("/api/balance-history", { cache: "no-store" });
+    if (!res.ok) return;
+    balanceHistoryData = await res.json();
+    for (const broker of Object.keys(balanceData)) renderBalanceChart(broker);
+  } catch {
+    // 조용히 넘어감 — 잔고/매매기록 등 다른 화면은 정상 동작해야 하므로.
+  }
+}
+
 function renderBalanceRowsFor(broker) {
   const tbody = document.getElementById(`balance-body-${broker}`);
   if (!tbody) return;
@@ -757,6 +826,14 @@ function renderBalanceSection(broker) {
       </table>
     </div>
     <p class="sub balance-asof">${asofText}</p>
+
+    <h4>일별 수익 추이 (${BROKER_LABELS[broker] || broker})</h4>
+    <div class="filter-row balance-metric-row" data-broker="${broker}">
+      <button class="filter-btn active" data-metric="rate">수익률</button>
+      <button class="filter-btn" data-metric="profit">수익(원)</button>
+    </div>
+    <div class="balance-chart-wrap" id="balance-chart-${broker}"></div>
+
     <h4>매매기록 (${BROKER_LABELS[broker] || broker})</h4>
     <ul class="trade-list" id="trade-list-${broker}"></ul>
     <div class="dividend-list-header">
@@ -767,6 +844,7 @@ function renderBalanceSection(broker) {
   `;
   balanceSectionsEl.appendChild(section);
   renderBalanceRowsFor(broker);
+  renderBalanceChart(broker);
 
   const tradesForBroker = allTrades.filter((t) => t.account === BROKER_ACCOUNT_TAG[broker]);
   renderTrades(tradesForBroker.filter((t) => t.action !== "dividend"), document.getElementById(`trade-list-${broker}`), "아직 매매 기록이 없습니다.");
@@ -803,9 +881,20 @@ balanceSectionsEl.addEventListener("click", (e) => {
     renderBalanceRowsFor(broker);
     return;
   }
+  const metricBtn = e.target.closest(".balance-metric-row .filter-btn");
+  if (metricBtn) {
+    const row = metricBtn.closest(".balance-metric-row");
+    const broker = row.dataset.broker;
+    row.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+    metricBtn.classList.add("active");
+    balanceMetricByBroker[broker] = metricBtn.dataset.metric;
+    renderBalanceChart(broker);
+    return;
+  }
   const refreshBtn = e.target.closest(".balance-refresh-btn");
   if (refreshBtn) {
     fetchBalance();
+    fetchBalanceHistory();
     return;
   }
   const dividendBtn = e.target.closest(".add-dividend-btn");
@@ -876,3 +965,4 @@ dividendForm.addEventListener("submit", async (e) => {
 });
 
 fetchBalance();
+fetchBalanceHistory();

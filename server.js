@@ -153,6 +153,22 @@ app.get("/api/balance", async (req, res) => {
   res.json(result);
 });
 
+// 계좌별 일별(종가 기준) 수익/수익률 히스토리 — balance_history.py가 하루 1건씩 쌓아둔 걸 그대로 반환
+app.get("/api/balance-history", async (req, res) => {
+  const { data, error } = await supabase
+    .from("balance_history")
+    .select("*")
+    .order("snapshot_date", { ascending: true });
+  if (error) return res.status(500).json({ error: error.message });
+
+  const brokers = {};
+  for (const row of data) {
+    if (!brokers[row.broker]) brokers[row.broker] = [];
+    brokers[row.broker].push(row);
+  }
+  res.json(brokers);
+});
+
 // 목록 조회 + 요약 통계
 app.get("/api/trades", async (req, res) => {
   const { data, error } = await supabase
