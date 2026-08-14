@@ -357,6 +357,13 @@ svg.fg-chart {
   z-index: 100;
 }
 
+/* [hidden]과 .modal-overlay가 동점 우선순위라 display:flex가 hidden 속성을 이겨버려서,
+   모달이 hidden=true여도 화면 전체를 뒤덮은 채 계속 떠있던 버그(2026-08-14, 사용자가
+   "취소가 안 눌려요"/"매매기록 누르면 배당모달이 뜬다"로 보고) — 이 규칙으로 확실히 이김. */
+.modal-overlay[hidden] {
+  display: none;
+}
+
 .modal-box {
   background: var(--surface-1);
   border-radius: 12px;
