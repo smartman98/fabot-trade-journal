@@ -77,12 +77,12 @@ function actionLabel(action) {
   return "배당";
 }
 
-function renderTrades(trades, targetUl) {
+function renderTrades(trades, targetUl, emptyText) {
   targetUl.innerHTML = "";
   if (trades.length === 0) {
     const empty = document.createElement("li");
     empty.className = "empty-state";
-    empty.textContent = "아직 매매 기록이 없습니다.";
+    empty.textContent = emptyText || "아직 매매 기록이 없습니다.";
     targetUl.appendChild(empty);
     return;
   }
@@ -769,8 +769,8 @@ function renderBalanceSection(broker) {
   renderBalanceRowsFor(broker);
 
   const tradesForBroker = allTrades.filter((t) => t.account === BROKER_ACCOUNT_TAG[broker]);
-  renderTrades(tradesForBroker.filter((t) => t.action !== "dividend"), document.getElementById(`trade-list-${broker}`));
-  renderTrades(tradesForBroker.filter((t) => t.action === "dividend"), document.getElementById(`dividend-list-${broker}`));
+  renderTrades(tradesForBroker.filter((t) => t.action !== "dividend"), document.getElementById(`trade-list-${broker}`), "아직 매매 기록이 없습니다.");
+  renderTrades(tradesForBroker.filter((t) => t.action === "dividend"), document.getElementById(`dividend-list-${broker}`), "아직 배당 기록이 없습니다.");
 }
 
 function renderAllBalanceSections() {
