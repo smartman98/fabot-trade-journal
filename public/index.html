@@ -42,7 +42,6 @@
 
     <!-- 계좌 잔고 (모의투자) -->
     <section id="balance-section">
-      <button id="add-dividend-btn" class="primary-btn">+ 배당 기록 추가</button>
       <div id="balance-sections"></div>
     </section>
 
@@ -104,6 +103,24 @@
         <button id="detail-back-btn" class="ghost-btn">목록으로</button>
       </div>
     </section>
+  </div>
+
+  <!-- 배당 기록 추가용 모달(별도 창) — 계좌 잔고 블록의 "+ 배당 기록 추가" 버튼이 이걸 연다 -->
+  <div id="dividend-modal-overlay" class="modal-overlay" hidden>
+    <div class="modal-box">
+      <h3 id="dividend-modal-title">배당 기록 추가</h3>
+      <form id="dividend-form">
+        <label>날짜 <input type="date" id="dm-date" required /></label>
+        <label>종목 <input type="text" id="dm-ticker" required /></label>
+        <label>세후 수령액 <input type="number" id="dm-amount" min="0" step="any" required /></label>
+        <label class="full">메모 (선택) <textarea id="dm-memo" rows="2"></textarea></label>
+        <div class="form-actions">
+          <button type="submit" class="primary-btn">저장</button>
+          <button type="button" id="dm-cancel-btn" class="ghost-btn">취소</button>
+        </div>
+        <p id="dm-error" class="error"></p>
+      </form>
+    </div>
   </div>
 
   <script src="fg_data.js"></script>

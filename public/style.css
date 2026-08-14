@@ -347,6 +347,36 @@ svg.fg-chart {
   color: #fff;
 }
 
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 11, 11, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-box {
+  background: var(--surface-1);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 360px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgba(11, 11, 11, 0.2);
+}
+
+.modal-box h3 { margin: 0 0 14px; }
+.modal-box label { display: block; margin-top: 10px; font-size: 13px; font-weight: 600; }
+.modal-box input, .modal-box textarea {
+  width: 100%; margin-top: 4px; padding: 8px; border: 1px solid var(--border);
+  border-radius: 6px; font: inherit; box-sizing: border-box;
+}
+.dividend-list-header { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+.dividend-list-header h4 { margin: 0; }
+
 .trade-main {
   flex: 1;
   min-width: 0;

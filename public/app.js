@@ -143,7 +143,6 @@ async function fetchTrades() {
 
 const fQuantityLabel = document.getElementById("f-quantity-label");
 const fPriceLabel = document.getElementById("f-price-label");
-const addDividendBtn = document.getElementById("add-dividend-btn");
 
 function updateFormLabelsForAction() {
   const isDividend = fAction.value === "dividend";
@@ -152,20 +151,6 @@ function updateFormLabelsForAction() {
   if (isDividend) fQuantity.value = 1;
 }
 fAction.addEventListener("change", updateFormLabelsForAction);
-
-function openAddDividendForm() {
-  editingId = null;
-  formTitle.textContent = "배당 기록 추가";
-  tradeForm.reset();
-  fDate.value = new Date().toISOString().slice(0, 10);
-  fAction.value = "dividend";
-  fQuantity.value = 1;
-  setAccountValue(null);
-  formError.textContent = "";
-  updateFormLabelsForAction();
-  showView("form");
-}
-addDividendBtn.addEventListener("click", openAddDividendForm);
 
 function openEditForm(trade) {
   editingId = trade.id;
@@ -774,12 +759,18 @@ function renderBalanceSection(broker) {
     <p class="sub balance-asof">${asofText}</p>
     <h4>매매기록 (${BROKER_LABELS[broker] || broker})</h4>
     <ul class="trade-list" id="trade-list-${broker}"></ul>
+    <div class="dividend-list-header">
+      <h4>배당기록 (${BROKER_LABELS[broker] || broker})</h4>
+      <button type="button" class="ghost-btn add-dividend-btn" data-broker="${broker}">+ 배당 기록 추가</button>
+    </div>
+    <ul class="trade-list" id="dividend-list-${broker}"></ul>
   `;
   balanceSectionsEl.appendChild(section);
   renderBalanceRowsFor(broker);
 
   const tradesForBroker = allTrades.filter((t) => t.account === BROKER_ACCOUNT_TAG[broker]);
-  renderTrades(tradesForBroker, document.getElementById(`trade-list-${broker}`));
+  renderTrades(tradesForBroker.filter((t) => t.action !== "dividend"), document.getElementById(`trade-list-${broker}`));
+  renderTrades(tradesForBroker.filter((t) => t.action === "dividend"), document.getElementById(`dividend-list-${broker}`));
 }
 
 function renderAllBalanceSections() {
@@ -813,7 +804,75 @@ balanceSectionsEl.addEventListener("click", (e) => {
     return;
   }
   const refreshBtn = e.target.closest(".balance-refresh-btn");
-  if (refreshBtn) fetchBalance();
+  if (refreshBtn) {
+    fetchBalance();
+    return;
+  }
+  const dividendBtn = e.target.closest(".add-dividend-btn");
+  if (dividendBtn) openDividendModal(dividendBtn.dataset.broker);
+});
+
+// ---------- 배당 기록 추가 모달(별도 창) ----------
+const dividendModalOverlay = document.getElementById("dividend-modal-overlay");
+const dividendModalTitle = document.getElementById("dividend-modal-title");
+const dividendForm = document.getElementById("dividend-form");
+const dmDate = document.getElementById("dm-date");
+const dmTicker = document.getElementById("dm-ticker");
+const dmAmount = document.getElementById("dm-amount");
+const dmMemo = document.getElementById("dm-memo");
+const dmError = document.getElementById("dm-error");
+const dmCancelBtn = document.getElementById("dm-cancel-btn");
+
+let dividendModalBroker = null;
+
+function openDividendModal(broker) {
+  dividendModalBroker = broker;
+  dividendModalTitle.textContent = `배당 기록 추가 (${BROKER_LABELS[broker] || broker})`;
+  dividendForm.reset();
+  dmDate.value = new Date().toISOString().slice(0, 10);
+  dmError.textContent = "";
+  dividendModalOverlay.hidden = false;
+}
+
+function closeDividendModal() {
+  dividendModalOverlay.hidden = true;
+  dividendModalBroker = null;
+}
+
+dmCancelBtn.addEventListener("click", closeDividendModal);
+dividendModalOverlay.addEventListener("click", (e) => {
+  if (e.target === dividendModalOverlay) closeDividendModal();
+});
+
+dividendForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  dmError.textContent = "";
+
+  const payload = {
+    trade_date: dmDate.value,
+    ticker: dmTicker.value.trim(),
+    action: "dividend",
+    quantity: 1,
+    price: dmAmount.value,
+    fg_score: null,
+    account: BROKER_ACCOUNT_TAG[dividendModalBroker],
+    memo: dmMemo.value.trim() || null,
+  };
+
+  const res = await fetch(API, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    dmError.textContent = err.error || "저장 중 오류가 발생했습니다.";
+    return;
+  }
+
+  closeDividendModal();
+  await fetchTrades();
 });
 
 fetchBalance();

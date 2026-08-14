@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-const VALID_ACTIONS = ["buy", "sell"];
+const VALID_ACTIONS = ["buy", "sell", "dividend"];
 
 // FABOT 매매 규칙 (fg-dashboard의 today_signal.py와 동일한 기준)
 function judgeSignal(score) {
