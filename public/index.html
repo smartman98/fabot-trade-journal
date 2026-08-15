@@ -20,6 +20,12 @@
         <div class="chart-col">
           <div class="chart-card">
             <p class="chart-title">F&G 지수 추이</p>
+            <div class="filter-row" id="filter-row">
+              <button class="filter-btn" data-range="30">최근 30일</button>
+              <button class="filter-btn active" data-range="90">최근 90일</button>
+              <button class="filter-btn" data-range="365">최근 1년</button>
+              <button class="filter-btn" data-range="all">전체</button>
+            </div>
             <div style="position:relative;">
               <svg class="fg-chart" id="chart" viewBox="0 0 640 260" role="img" aria-label="F&G 지수 추이 차트"></svg>
               <div class="tooltip" id="tooltip"></div>
@@ -33,13 +39,6 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <div class="filter-row" id="filter-row">
-        <button class="filter-btn" data-range="30">최근 30일</button>
-        <button class="filter-btn active" data-range="90">최근 90일</button>
-        <button class="filter-btn" data-range="365">최근 1년</button>
-        <button class="filter-btn" data-range="all">전체</button>
       </div>
     </section>
 
