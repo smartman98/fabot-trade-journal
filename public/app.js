@@ -794,6 +794,45 @@ function renderBalanceRowsFor(broker) {
   }
 }
 
+const COMPOSITION_COLORS = ["var(--cat-1)", "var(--cat-2)", "var(--cat-3)", "var(--cat-4)", "var(--cat-5)"];
+
+// 사용자가 참고로 보여준 실계좌 앱 화면(총 투자자산 → 색상 바 → 종목별 %)과 같은 스타일로,
+// 모의계좌 보유종목을 평가금액 비중(%) 기준으로 보여준다 — 통화 토글과 무관하게 항상 원화 기준.
+function renderAssetComposition(broker) {
+  const wrap = document.getElementById(`asset-composition-${broker}`);
+  if (!wrap) return;
+  const info = balanceData[broker];
+  if (!info || !info.rows.length) {
+    wrap.innerHTML = `<p class="muted">보유 종목이 없습니다.</p>`;
+    return;
+  }
+
+  const rows = [...info.rows].sort((a, b) => Number(b.krw_current_value) - Number(a.krw_current_value));
+  const total = rows.reduce((sum, r) => sum + Number(r.krw_current_value), 0);
+  const segments = rows.map((r, i) => ({
+    row: r,
+    pct: total > 0 ? (Number(r.krw_current_value) / total) * 100 : 0,
+    color: COMPOSITION_COLORS[i % COMPOSITION_COLORS.length],
+  }));
+
+  const bar = segments
+    .map((s) => `<div class="composition-bar-segment" style="width:${s.pct.toFixed(2)}%; background:${s.color};"></div>`)
+    .join("");
+
+  const list = segments
+    .map((s) => `
+      <div class="composition-row">
+        <span class="composition-dot" style="background:${s.color};"></span>
+        <span class="composition-label">${s.row.market === "domestic" ? "국내" : "해외"} · ${s.row.label}</span>
+        <span class="composition-pct">${s.pct.toFixed(1)}%</span>
+        <span class="composition-value">${formatMoney(s.row.krw_current_value)}원</span>
+      </div>
+    `)
+    .join("");
+
+  wrap.innerHTML = `<div class="composition-bar">${bar}</div><div class="composition-list">${list}</div>`;
+}
+
 function renderBalanceSection(broker) {
   const { rows, summary } = balanceData[broker];
   const profitCls = summary.krwProfit >= 0 ? "buy" : "sell";
@@ -827,6 +866,9 @@ function renderBalanceSection(broker) {
     </div>
     <p class="sub balance-asof">${asofText}</p>
 
+    <h4>자산구성 (${BROKER_LABELS[broker] || broker})</h4>
+    <div class="asset-composition" id="asset-composition-${broker}"></div>
+
     <h4>일별 수익 추이 (${BROKER_LABELS[broker] || broker})</h4>
     <div class="filter-row balance-metric-row" data-broker="${broker}">
       <button class="filter-btn active" data-metric="rate">수익률</button>
@@ -844,6 +886,7 @@ function renderBalanceSection(broker) {
   `;
   balanceSectionsEl.appendChild(section);
   renderBalanceRowsFor(broker);
+  renderAssetComposition(broker);
   renderBalanceChart(broker);
 
   const tradesForBroker = allTrades.filter((t) => t.account === BROKER_ACCOUNT_TAG[broker]);

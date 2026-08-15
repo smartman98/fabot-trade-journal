@@ -16,6 +16,9 @@
 
   --cat-1: #2a78d6; /* 실제값 */
   --cat-2: #1baf7a; /* 우리 계산값 / 커버드콜 구간 */
+  --cat-3: #f2a93b;
+  --cat-4: #9b59b6;
+  --cat-5: #95a5a6;
 }
 
 * {
@@ -202,6 +205,38 @@ svg.fg-chart {
 .balance-broker-block { margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--gridline); }
 .balance-broker-block:last-child { border-bottom: none; }
 .balance-broker-block h3 { margin-bottom: 4px; }
+
+.asset-composition { margin: 10px 0 16px; }
+
+.composition-bar {
+  display: flex;
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--gridline);
+}
+.composition-bar-segment { height: 100%; }
+
+.composition-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+.composition-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.composition-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.composition-label { flex: 1; color: var(--text-primary); }
+.composition-pct { font-weight: 700; width: 46px; text-align: right; }
+.composition-value { color: var(--text-secondary); width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
 
 .balance-chart-wrap {
   background: var(--diverge-neutral);
