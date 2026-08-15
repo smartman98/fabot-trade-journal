@@ -877,8 +877,8 @@ function renderBalanceSection(broker) {
       <button class="filter-btn active" data-currency="KRW">원화</button>
       <button class="filter-btn" data-currency="NATIVE">외화</button>
       <button class="filter-btn" data-currency="ALL">모두</button>
+      <button class="ghost-btn balance-refresh-btn" data-broker="${broker}">잔고 새로고침</button>
     </div>
-    <button class="ghost-btn balance-refresh-btn" data-broker="${broker}">잔고 새로고침</button>
     <div class="summary-bar">
       <div class="summary-chip"><div class="label">총매입(원)</div><div class="value">${formatMoney(summary.krwAvgTotal)}</div></div>
       <div class="summary-chip"><div class="label">총평가(원)</div><div class="value">${formatMoney(summary.krwCurrentTotal)}</div></div>
