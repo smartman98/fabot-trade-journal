@@ -842,7 +842,11 @@ function renderAssetComposition(broker) {
     `)
     .join("");
 
-  wrap.innerHTML = `<div class="composition-bar">${bar}</div><div class="composition-list">${list}</div>`;
+  wrap.innerHTML = `
+    <p class="composition-total">총 투자 자산 <span class="composition-total-amount">${formatMoney(total)}원</span></p>
+    <div class="composition-bar">${bar}</div>
+    <div class="composition-list">${list}</div>
+  `;
 }
 
 async function fetchCash() {
@@ -869,7 +873,6 @@ function renderBalanceSection(broker) {
   section.innerHTML = `
     <h3>계좌 잔고 (${BROKER_LABELS[broker] || broker})</h3>
 
-    <h4>자산구성 (${BROKER_LABELS[broker] || broker})</h4>
     <div class="asset-composition" id="asset-composition-${broker}"></div>
 
     <p class="sub">해외 종목 표시통화</p>

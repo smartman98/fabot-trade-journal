@@ -233,6 +233,18 @@ svg.fg-chart {
 
 .asset-composition { margin: 10px 0 16px; }
 
+.composition-total {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+.composition-total-amount {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-left: 4px;
+}
+
 .composition-bar {
   display: flex;
   width: 100%;
