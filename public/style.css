@@ -66,8 +66,8 @@ h1 {
   align-items: stretch;
 }
 
-.signal-col { flex: 3; min-width: 280px; }
-.chart-col { flex: 2; min-width: 280px; }
+.signal-col { flex: 2; min-width: 280px; }
+.chart-col { flex: 3; min-width: 280px; }
 .signal-col .signal-banner { height: 100%; }
 .chart-col .chart-card { height: 100%; }
 
@@ -122,6 +122,16 @@ h1 {
   background: var(--surface-1);
   color: var(--text-secondary);
   cursor: pointer;
+}
+
+#filter-row .filter-btn {
+  font-size: 11px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+#filter-row {
+  gap: 4px;
 }
 
 .filter-btn.active {
