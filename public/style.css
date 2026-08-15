@@ -245,6 +245,19 @@ svg.fg-chart {
   margin-left: 4px;
 }
 
+.composition-cashflow {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--gridline);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+.composition-cashflow-amount {
+  font-weight: 700;
+  color: var(--cat-2);
+  margin-left: 4px;
+}
+
 .composition-bar {
   display: flex;
   width: 100%;

@@ -842,10 +842,18 @@ function renderAssetComposition(broker) {
     `)
     .join("");
 
+  // 월 현금흐름 = 커버드콜(472150) 평가금액 * 0.0125 (연 15% 배당수익률 가정, CLAUDE.md
+  // 실측 기준 — 실제 배당기록과는 별개로, "지금 배분이면 매달 이만큼 나온다"는 예상치임.
+  const coveredCallRow = (info ? info.rows : []).find((r) => r.ticker === "472150");
+  const monthlyCashflowHtml = coveredCallRow
+    ? `<p class="composition-cashflow">예상 월 현금흐름 (커버드콜 기준) <span class="composition-cashflow-amount">${formatMoney(Number(coveredCallRow.krw_current_value) * 0.0125)}원</span></p>`
+    : "";
+
   wrap.innerHTML = `
     <p class="composition-total">총 투자 자산 <span class="composition-total-amount">${formatMoney(total)}원</span></p>
     <div class="composition-bar">${bar}</div>
     <div class="composition-list">${list}</div>
+    ${monthlyCashflowHtml}
   `;
 }
 
