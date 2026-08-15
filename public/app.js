@@ -409,9 +409,11 @@ async function fetchTodaySignal() {
 const SVG_NS = "http://www.w3.org/2000/svg";
 // fg_data.js는 2026-07-22에 한 번 만들어진 정적 스냅샷이라 시간이 지날수록 오래된 값으로
 // 굳어있다(2026-08-13 실측: "오늘의 신호"는 62인데 이 정적 스냅샷의 마지막 값은 7월 중순
-// 41.7로 3주 넘게 멈춰있었음). 화면이 바로 뜨도록 정적 스냅샷을 먼저 보여주고, 뒤이어
-// /api/signal/history(실시간 Supabase 조회)로 교체한다.
-let history = typeof FG_DATA !== "undefined" ? FG_DATA.history : [];
+// 41.7로 3주 넘게 멈춰있었음). 예전엔 이 스냅샷을 먼저 보여주고 몇 초 뒤 실시간 값으로
+// 바꿔치기했는데, 사용자가 그 "잠깐 틀린 값이 보이는" 상태를 원치 않아서(2026-08-15)
+// 실시간 조회(/api/signal/history)가 끝날 때까지 기다렸다가 한 번에 그린다.
+// 실시간 조회 자체가 실패했을 때만 이 정적 스냅샷을 최후의 대체값으로 쓴다.
+let history = [];
 
 function filterRange(rangeKey) {
   if (rangeKey === "all") return history;
@@ -643,17 +645,16 @@ function currentActiveRange() {
 async function fetchFgHistory() {
   try {
     const res = await fetch("/api/signal/history", { cache: "no-store" });
-    if (!res.ok) return;
+    if (!res.ok) throw new Error("history fetch failed");
     const live = await res.json();
-    if (live.length === 0) return;
+    if (live.length === 0) throw new Error("empty history");
     history = live;
-    renderFgAll(currentActiveRange());
   } catch {
-    // 실패해도 정적 스냅샷이 이미 화면에 떠 있으니 조용히 넘어간다.
+    // 실시간 조회가 실패했을 때만 정적 스냅샷으로 대체한다(둘 다 없으면 빈 차트로 둠).
+    if (history.length === 0 && typeof FG_DATA !== "undefined") history = FG_DATA.history;
   }
+  if (history.length > 0) renderFgAll(currentActiveRange());
 }
-
-if (history.length > 0) renderFgAll("90");
 
 fetchTrades();
 fetchTodaySignal();
