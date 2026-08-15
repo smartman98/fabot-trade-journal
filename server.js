@@ -169,6 +169,17 @@ app.get("/api/balance-history", async (req, res) => {
   res.json(brokers);
 });
 
+// 계좌별 예수금(현금) — 자산구성(%) 화면에서 "현금" 비중 표시용. demo_balance(보유종목)와
+// 별개 표라서 계좌 잔고 요약(총매입/총평가/총수익률)의 기존 계산에는 영향 없음.
+app.get("/api/cash", async (req, res) => {
+  const { data, error } = await supabase.from("demo_cash").select("*");
+  if (error) return res.status(500).json({ error: error.message });
+
+  const result = {};
+  for (const row of data) result[row.broker] = Number(row.krw_amount);
+  res.json(result);
+});
+
 // 목록 조회 + 요약 통계
 app.get("/api/trades", async (req, res) => {
   const { data, error } = await supabase

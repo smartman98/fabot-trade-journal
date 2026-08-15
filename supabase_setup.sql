@@ -73,3 +73,12 @@ create table balance_history (
 
 alter table balance_history enable row level security;
 revoke all on balance_history from anon;
+
+-- 계좌별 예수금(현금) — 자산구성(%) 화면의 '현금' 비중용 (2026-08-15)
+create table demo_cash (
+  broker text primary key,
+  krw_amount numeric not null,
+  updated_at timestamptz not null default now()
+);
+alter table demo_cash enable row level security;
+revoke all on demo_cash from anon;

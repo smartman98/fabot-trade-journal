@@ -795,23 +795,33 @@ function renderBalanceRowsFor(broker) {
 }
 
 const COMPOSITION_COLORS = ["var(--cat-1)", "var(--cat-2)", "var(--cat-3)", "var(--cat-4)", "var(--cat-5)"];
+let cashByBroker = {}; // { KIS: krw_amount, Kiwoom: krw_amount }
 
 // 사용자가 참고로 보여준 실계좌 앱 화면(총 투자자산 → 색상 바 → 종목별 %)과 같은 스타일로,
-// 모의계좌 보유종목을 평가금액 비중(%) 기준으로 보여준다 — 통화 토글과 무관하게 항상 원화 기준.
+// 모의계좌 보유종목 + 예수금(현금)의 비중(%)을 보여준다 — 통화 토글과 무관하게 항상 원화 기준.
+// 현금은 demo_balance가 아니라 별도 demo_cash 표에서 오므로, 계좌 잔고 요약(총매입/총평가/
+// 총수익률)의 기존 계산에는 영향을 주지 않는다.
 function renderAssetComposition(broker) {
   const wrap = document.getElementById(`asset-composition-${broker}`);
   if (!wrap) return;
   const info = balanceData[broker];
-  if (!info || !info.rows.length) {
+  const stockItems = (info ? info.rows : []).map((r) => ({
+    label: `${r.market === "domestic" ? "국내" : "해외"} · ${r.label}`,
+    value: Number(r.krw_current_value),
+  }));
+  const cash = cashByBroker[broker];
+  const items = cash ? [...stockItems, { label: "현금(예수금)", value: cash }] : stockItems;
+
+  if (!items.length) {
     wrap.innerHTML = `<p class="muted">보유 종목이 없습니다.</p>`;
     return;
   }
 
-  const rows = [...info.rows].sort((a, b) => Number(b.krw_current_value) - Number(a.krw_current_value));
-  const total = rows.reduce((sum, r) => sum + Number(r.krw_current_value), 0);
-  const segments = rows.map((r, i) => ({
-    row: r,
-    pct: total > 0 ? (Number(r.krw_current_value) / total) * 100 : 0,
+  items.sort((a, b) => b.value - a.value);
+  const total = items.reduce((sum, it) => sum + it.value, 0);
+  const segments = items.map((it, i) => ({
+    ...it,
+    pct: total > 0 ? (it.value / total) * 100 : 0,
     color: COMPOSITION_COLORS[i % COMPOSITION_COLORS.length],
   }));
 
@@ -823,14 +833,25 @@ function renderAssetComposition(broker) {
     .map((s) => `
       <div class="composition-row">
         <span class="composition-dot" style="background:${s.color};"></span>
-        <span class="composition-label">${s.row.market === "domestic" ? "국내" : "해외"} · ${s.row.label}</span>
+        <span class="composition-label">${s.label}</span>
         <span class="composition-pct">${s.pct.toFixed(1)}%</span>
-        <span class="composition-value">${formatMoney(s.row.krw_current_value)}원</span>
+        <span class="composition-value">${formatMoney(s.value)}원</span>
       </div>
     `)
     .join("");
 
   wrap.innerHTML = `<div class="composition-bar">${bar}</div><div class="composition-list">${list}</div>`;
+}
+
+async function fetchCash() {
+  try {
+    const res = await fetch("/api/cash", { cache: "no-store" });
+    if (!res.ok) return;
+    cashByBroker = await res.json();
+    for (const broker of Object.keys(balanceData)) renderAssetComposition(broker);
+  } catch {
+    // 조용히 넘어감 — 잔고/매매기록 등 다른 화면은 정상 동작해야 하므로.
+  }
 }
 
 function renderBalanceSection(broker) {
@@ -938,6 +959,7 @@ balanceSectionsEl.addEventListener("click", (e) => {
   if (refreshBtn) {
     fetchBalance();
     fetchBalanceHistory();
+    fetchCash();
     return;
   }
   const dividendBtn = e.target.closest(".add-dividend-btn");
@@ -1009,3 +1031,4 @@ dividendForm.addEventListener("submit", async (e) => {
 
 fetchBalance();
 fetchBalanceHistory();
+fetchCash();
