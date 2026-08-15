@@ -868,6 +868,10 @@ function renderBalanceSection(broker) {
   section.className = "balance-broker-block";
   section.innerHTML = `
     <h3>계좌 잔고 (${BROKER_LABELS[broker] || broker})</h3>
+
+    <h4>자산구성 (${BROKER_LABELS[broker] || broker})</h4>
+    <div class="asset-composition" id="asset-composition-${broker}"></div>
+
     <p class="sub">해외 종목 표시통화</p>
     <div class="filter-row balance-currency-row" data-broker="${broker}">
       <button class="filter-btn active" data-currency="KRW">원화</button>
@@ -888,9 +892,6 @@ function renderBalanceSection(broker) {
       </table>
     </div>
     <p class="sub balance-asof">${asofText}</p>
-
-    <h4>자산구성 (${BROKER_LABELS[broker] || broker})</h4>
-    <div class="asset-composition" id="asset-composition-${broker}"></div>
 
     <h4>일별 수익 추이 (${BROKER_LABELS[broker] || broker})</h4>
     <div class="filter-row balance-metric-row" data-broker="${broker}">
