@@ -38,7 +38,7 @@ body {
 
 .app {
   width: 100%;
-  max-width: 640px;
+  max-width: 960px;
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: 20px;
@@ -63,6 +63,18 @@ h1 {
   font-size: 1.1rem;
   margin: 0 0 12px;
 }
+
+.signal-grid {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.signal-col { flex: 3; min-width: 280px; }
+.chart-col { flex: 2; min-width: 280px; }
+.signal-col .signal-banner { height: 100%; }
+.chart-col .chart-card { height: 100%; }
 
 .section-divider {
   border: none;
