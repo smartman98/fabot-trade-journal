@@ -393,6 +393,7 @@ async function fetchTodaySignal() {
     const whenText = `${when.getMonth() + 1}/${when.getDate()} ${pad(when.getHours())}:${pad(when.getMinutes())} 기준`;
 
     signalBanner.innerHTML = `
+      <p class="chart-title signal-banner-title">오늘의 신호</p>
       <div class="gauge-wrap">${buildGaugeSvg(todaySignal.score)}</div>
       <div class="signal-text">${zoneLabel(todaySignal.score)}</div>
       <div class="signal-meta">${whenText}</div>

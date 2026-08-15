@@ -59,11 +59,6 @@ h1 {
   font-size: 0.9rem;
 }
 
-#signal-section h2 {
-  font-size: 1.1rem;
-  margin: 0 0 12px;
-}
-
 .signal-grid {
   display: flex;
   gap: 20px;
@@ -90,6 +85,11 @@ h1 {
   border-radius: 14px;
   padding: 16px 18px 18px;
   margin-bottom: 20px;
+}
+
+.signal-banner .signal-banner-title {
+  align-self: flex-start;
+  width: 100%;
 }
 
 .signal-banner .gauge-wrap {
