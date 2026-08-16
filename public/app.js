@@ -883,12 +883,11 @@ function renderBalanceSection(broker) {
 
     <div class="asset-composition" id="asset-composition-${broker}"></div>
 
-    <p class="sub">해외 종목 표시통화</p>
     <div class="filter-row balance-currency-row" data-broker="${broker}">
       <button class="filter-btn active" data-currency="KRW">원화</button>
       <button class="filter-btn" data-currency="NATIVE">외화</button>
       <button class="filter-btn" data-currency="ALL">모두</button>
-      <button class="ghost-btn balance-refresh-btn" data-broker="${broker}">잔고 새로고침</button>
+      <button class="ghost-btn balance-refresh-btn" data-broker="${broker}" title="잔고 새로고침" aria-label="잔고 새로고침">↻</button>
     </div>
     <div class="summary-bar">
       <div class="summary-chip"><div class="label">총매입(원)</div><div class="value">${formatMoney(summary.krwAvgTotal)}</div></div>

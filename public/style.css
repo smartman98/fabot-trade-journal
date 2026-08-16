@@ -224,9 +224,18 @@ svg.fg-chart {
 .balance-table .pos { color: var(--diverge-red); font-weight: 600; }   /* 국내 증권가 관례: 상승/수익 = 빨강 */
 .balance-table .neg { color: var(--diverge-blue); font-weight: 600; } /* 하락/손실 = 파랑 */
 .balance-asof { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
-.balance-refresh-btn { display: block; margin: 10px 0; }
 .balance-currency-row { flex-wrap: wrap; }
-.balance-currency-row .balance-refresh-btn { margin: 0 0 0 auto; }
+.balance-currency-row .balance-refresh-btn {
+  margin: 0 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+}
 .balance-broker-block { margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--gridline); }
 .balance-broker-block:last-child { border-bottom: none; }
 .balance-broker-block h3 { margin-bottom: 4px; }
