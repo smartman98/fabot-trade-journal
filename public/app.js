@@ -873,7 +873,7 @@ function renderBalanceSection(broker) {
   const profitCls = summary.krwProfit >= 0 ? "buy" : "sell";
   const latest = rows.reduce((max, r) => (r.updated_at > max ? r.updated_at : max), "");
   const asofText = latest
-    ? `${new Date(latest).toLocaleString("ko-KR")} 기준 스냅샷 — 스케줄 실행 때마다 갱신됨`
+    ? `${new Date(latest).toLocaleString("ko-KR")} 기준 — 새로고침(↻) 또는 접속 시 실시간 갱신됨`
     : "";
 
   const section = document.createElement("div");
@@ -947,6 +947,25 @@ async function fetchBalance() {
   }
 }
 
+// KIS/Kiwoom API를 서버가 그 자리에서 직접 호출해 demo_balance/demo_cash를 최신값으로
+// upsert한 다음(POST /api/balance/refresh), 그 결과를 화면에 반영한다(GET 재조회) —
+// "새로고침을 눌러도 몇 분 전 스케줄 값 그대로"였던 문제(2026-08-18)를 없애기 위해 도입.
+// 증권사 하나가 실패해도(장 마감/키 미설정 등) errors에만 담기고 나머지는 정상 반영된다.
+async function refreshLiveBalances() {
+  let errors = {};
+  try {
+    const res = await fetch("/api/balance/refresh", { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      errors = data.errors || {};
+    }
+  } catch {
+    // 네트워크 실패 — 아래에서 기존에 저장된 값이라도 화면에 채운다.
+  }
+  await Promise.all([fetchBalance(), fetchBalanceHistory(), fetchCash()]);
+  return errors;
+}
+
 balanceSectionsEl.addEventListener("click", (e) => {
   const currencyBtn = e.target.closest(".balance-currency-row .filter-btn");
   if (currencyBtn) {
@@ -974,10 +993,18 @@ balanceSectionsEl.addEventListener("click", (e) => {
     // 추가함 — 실제로는 정상 동작하고 있었지만 로딩 표시가 전혀 없었던 게 문제였음.
     refreshBtn.classList.add("spinning");
     refreshBtn.disabled = true;
-    Promise.all([fetchBalance(), fetchBalanceHistory(), fetchCash()]).finally(() => {
-      refreshBtn.classList.remove("spinning");
-      refreshBtn.disabled = false;
-    });
+    refreshLiveBalances()
+      .then((errors) => {
+        const failedBrokers = Object.keys(errors);
+        if (failedBrokers.length > 0) {
+          const detail = failedBrokers.map((b) => `${BROKER_LABELS[b] || b}: ${errors[b]}`).join("\n");
+          alert(`실시간 갱신에 실패한 계좌가 있습니다(저장된 값을 그대로 보여줍니다):\n${detail}`);
+        }
+      })
+      .finally(() => {
+        refreshBtn.classList.remove("spinning");
+        refreshBtn.disabled = false;
+      });
     return;
   }
   const dividendBtn = e.target.closest(".add-dividend-btn");
@@ -1047,6 +1074,4 @@ dividendForm.addEventListener("submit", async (e) => {
   await fetchTrades();
 });
 
-fetchBalance();
-fetchBalanceHistory();
-fetchCash();
+refreshLiveBalances();

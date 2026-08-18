@@ -2,6 +2,7 @@ require("dotenv").config();
 const path = require("path");
 const express = require("express");
 const { createClient } = require("@supabase/supabase-js");
+const { fetchLiveSnapshot } = require("./broker_live");
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
@@ -178,6 +179,42 @@ app.get("/api/cash", async (req, res) => {
   const result = {};
   for (const row of data) result[row.broker] = Number(row.krw_amount);
   res.json(result);
+});
+
+// 잔고 실시간 새로고침 — 저장된 스냅샷을 그냥 다시 읽는 게 아니라, KIS/Kiwoom API를 지금
+// 이 자리에서 직접 호출해 최신 보유종목/현금을 받아와 demo_balance/demo_cash에 upsert한다.
+// 두 증권사 중 하나만 API키가 설정돼 있거나 하나만 실패해도 나머지는 정상 반영되고,
+// 실패한 브로커는 errors에 이유와 함께 담겨 응답한다(화면은 그 브로커만 이전 값 유지).
+app.post("/api/balance/refresh", async (req, res) => {
+  const snapshot = await fetchLiveSnapshot(supabase);
+  const nowIso = new Date().toISOString();
+  const updated = [];
+  const errors = {};
+
+  for (const [broker, result] of Object.entries(snapshot)) {
+    if (result.error) {
+      errors[broker] = result.error;
+      continue;
+    }
+    if (result.rows.length > 0) {
+      const rows = result.rows.map((r) => ({ ...r, updated_at: nowIso }));
+      const { error } = await supabase.from("demo_balance").upsert(rows, { onConflict: "broker,ticker" });
+      if (error) {
+        errors[broker] = error.message;
+        continue;
+      }
+    }
+    const { error: cashError } = await supabase
+      .from("demo_cash")
+      .upsert({ broker, krw_amount: result.cashKrw, updated_at: nowIso }, { onConflict: "broker" });
+    if (cashError) {
+      errors[broker] = cashError.message;
+      continue;
+    }
+    updated.push(broker);
+  }
+
+  res.json({ updated, errors });
 });
 
 // 목록 조회 + 요약 통계
