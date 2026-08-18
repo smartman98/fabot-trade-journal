@@ -1075,3 +1075,12 @@ dividendForm.addEventListener("submit", async (e) => {
 });
 
 refreshLiveBalances();
+
+// 1분마다 자동으로 실시간 재조회 — 화면을 계속 열어두고 있으면 값이 계속 최신으로
+// 유지된다(2026-08-18, 사용자 요청). 수동 새로고침 버튼과 달리 실패해도 alert로
+// 방해하지 않고 콘솔에만 남긴다 — 매분 팝업이 뜨면 오히려 불편하기 때문.
+setInterval(() => {
+  refreshLiveBalances().then((errors) => {
+    if (Object.keys(errors).length > 0) console.warn("자동 새로고침 중 일부 계좌 실패:", errors);
+  });
+}, 60_000);
