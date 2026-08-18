@@ -236,6 +236,12 @@ svg.fg-chart {
   font-size: 16px;
   line-height: 1;
 }
+.balance-refresh-btn.spinning { animation: spin 0.6s linear infinite; opacity: 0.6; }
+.balance-refresh-btn:disabled { cursor: default; }
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 .balance-broker-block { margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--gridline); }
 .balance-broker-block:last-child { border-bottom: none; }
 .balance-broker-block h3 { margin-bottom: 4px; }

@@ -970,9 +970,14 @@ balanceSectionsEl.addEventListener("click", (e) => {
   }
   const refreshBtn = e.target.closest(".balance-refresh-btn");
   if (refreshBtn) {
-    fetchBalance();
-    fetchBalanceHistory();
-    fetchCash();
+    // 눌러도 화면에 아무 반응이 없어서 "안 눌리는 것 같다"는 피드백(2026-08-18)을 받아서
+    // 추가함 — 실제로는 정상 동작하고 있었지만 로딩 표시가 전혀 없었던 게 문제였음.
+    refreshBtn.classList.add("spinning");
+    refreshBtn.disabled = true;
+    Promise.all([fetchBalance(), fetchBalanceHistory(), fetchCash()]).finally(() => {
+      refreshBtn.classList.remove("spinning");
+      refreshBtn.disabled = false;
+    });
     return;
   }
   const dividendBtn = e.target.closest(".add-dividend-btn");
