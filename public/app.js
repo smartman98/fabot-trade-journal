@@ -952,6 +952,11 @@ async function fetchBalance() {
 // "새로고침을 눌러도 몇 분 전 스케줄 값 그대로"였던 문제(2026-08-18)를 없애기 위해 도입.
 // 증권사 하나가 실패해도(장 마감/키 미설정 등) errors에만 담기고 나머지는 정상 반영된다.
 async function refreshLiveBalances() {
+  // 먼저 저장된(직전) 값으로 화면부터 빠르게 채운다 — 실시간 조회는 KIS/Kiwoom
+  // API를 여러 번 순차 호출해서 몇 초 걸리는데, 그동안 화면이 통째로 비어있는 것처럼
+  // 보이던 문제(2026-08-20 피드백)를 없애기 위함. 이후 실시간 값이 오면 다시 그린다.
+  await Promise.all([fetchBalance(), fetchBalanceHistory(), fetchCash()]);
+
   let errors = {};
   try {
     const res = await fetch("/api/balance/refresh", { method: "POST" });
@@ -960,7 +965,7 @@ async function refreshLiveBalances() {
       errors = data.errors || {};
     }
   } catch {
-    // 네트워크 실패 — 아래에서 기존에 저장된 값이라도 화면에 채운다.
+    // 네트워크 실패 — 이미 저장된 값이 화면에 떠 있으니 조용히 넘어간다.
   }
   await Promise.all([fetchBalance(), fetchBalanceHistory(), fetchCash()]);
   return errors;
