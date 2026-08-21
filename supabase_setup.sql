@@ -82,3 +82,12 @@ create table demo_cash (
 );
 alter table demo_cash enable row level security;
 revoke all on demo_cash from anon;
+
+-- 2026-08-21 추가: 잔고 표의 "현재가" 옆에 전일대비(등락)를 보여주기 위해 전일종가를
+-- 같이 저장한다. prev_close=거래소 표시통화(국내 원/TQQQ 달러), krw_prev_close=원화
+-- 환산(krw_avg_value와 같은 관례로, 그날그날 환율이 아니라 "지금" 환율을 곱해서 저장).
+-- nullable로 둔 이유: push_demo_balance.py/push_demo_balance_kiwoom.py(10분마다 도는
+-- 기존 파이썬 스케줄 잡)는 이 필드를 아직 채우지 않는데, NOT NULL이면 그 upsert가
+-- 깨진다 — 이 표는 Node 쪽(broker_live.js, "새로고침" 버튼)에서만 채워도 되게 한다.
+alter table demo_balance add column if not exists prev_close numeric;
+alter table demo_balance add column if not exists krw_prev_close numeric;

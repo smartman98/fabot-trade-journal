@@ -89,6 +89,33 @@ async function kisDomesticAskingPrice(pdno) {
   return data.output1;
 }
 
+// 전일종가 조회용 — 호가(asking-price) 응답엔 전일대비 정보가 없어서 현재가 시세
+// (inquire-price)를 한 번 더 부른다. prdy_vrss_sign: 1=상한/2=상승/3=보합/4=하한/5=하락
+// (KIS 공식 코드) — stck_prpr(그 응답 자신의 현재가) 기준으로 전일종가를 역산해두면,
+// 실제 화면에 표시하는 현재가(매도1호가)가 stck_prpr와 살짝 달라도 "표시된 현재가 -
+// 전일종가"로 다시 빼서 전일대비를 일관되게 계산할 수 있다.
+async function kisDomesticPrevClose(pdno) {
+  const data = await kisGet(
+    "/uapi/domestic-stock/v1/quotations/inquire-price",
+    "FHKST01010100",
+    { FID_COND_MRKT_DIV_CODE: "J", FID_INPUT_ISCD: pdno }
+  );
+  const stckPrpr = Number(data.output.stck_prpr);
+  const vrss = Number(data.output.prdy_vrss);
+  const sign = data.output.prdy_vrss_sign;
+  const signedVrss = sign === "1" || sign === "2" ? vrss : sign === "4" || sign === "5" ? -vrss : 0;
+  return stckPrpr - signedVrss;
+}
+
+// 해외는 현재가상세(price-detail)의 base가 그 자체로 기준가(전일종가)라 부호 계산이 필요 없다.
+async function kisOverseasPrevClose(pdno, excg) {
+  const quoteExcd = QUOTE_EXCD_BY_ORDER_EXCG[excg] || excg;
+  const data = await kisGet("/uapi/overseas-price/v1/quotations/price-detail", "HHDFS76200200", {
+    AUTH: "", EXCD: quoteExcd, SYMB: pdno,
+  });
+  return Number(data.output.base);
+}
+
 async function kisDomesticBalanceRaw() {
   return kisGet("/uapi/domestic-stock/v1/trading/inquire-balance", "VTTC8434R", {
     CANO: kisCano(),
@@ -187,6 +214,12 @@ async function fetchKisSnapshot(supabase) {
     if (!(currentPrice > 0)) {
       currentPrice = (await previousCurrentPrice(supabase, "KIS", COVERED_CALL_STOCK_CODE)) ?? domestic.avg_price;
     }
+    // 전일대비 표시는 부가 정보라, 이 호출이 실패해도(예: 장 시작 전 데이터 없음)
+    // 잔고 조회 자체가 죽으면 안 된다 — 실패하면 조용히 null로 둔다.
+    let prevClose = null;
+    try {
+      prevClose = await kisDomesticPrevClose(COVERED_CALL_STOCK_CODE);
+    } catch { /* 무시 — 전일대비 칸만 비게 됨 */ }
     rows.push({
       broker: "KIS",
       ticker: COVERED_CALL_STOCK_CODE,
@@ -195,6 +228,8 @@ async function fetchKisSnapshot(supabase) {
       quantity: domestic.qty,
       avg_price: domestic.avg_price,
       current_price: currentPrice,
+      prev_close: prevClose,
+      krw_prev_close: prevClose,
       currency: "KRW",
       krw_avg_value: domestic.avg_price * domestic.qty,
       krw_current_value: currentPrice * domestic.qty,
@@ -211,6 +246,10 @@ async function fetchKisSnapshot(supabase) {
     }
     const exrt = await kisGetUsdKrwRate(currentPrice);
     exrtForCash = exrt;
+    let prevClose = null;
+    try {
+      prevClose = await kisOverseasPrevClose("TQQQ", TQQQ_EXCG);
+    } catch { /* 무시 — 전일대비 칸만 비게 됨 */ }
     rows.push({
       broker: "KIS",
       ticker: "TQQQ",
@@ -218,6 +257,10 @@ async function fetchKisSnapshot(supabase) {
       label: "TQQQ",
       quantity: overseas.qty,
       avg_price: overseas.avg_price,
+      prev_close: prevClose,
+      // avg_price/krw_avg_value와 같은 관례 — 어제 실제 환율이 아니라 지금 환율을
+      // 그대로 곱한다(krw_avg_value가 이미 그렇게 하고 있음, 아래 참고).
+      krw_prev_close: prevClose != null ? prevClose * exrt : null,
       current_price: currentPrice,
       currency: "USD",
       krw_avg_value: overseas.avg_price * overseas.qty * exrt,
@@ -313,6 +356,9 @@ async function fetchKiwoomSnapshot() {
     if (!(qty > 0)) continue;
     const avgPrice = Number(holding.pur_pric);
     const currentPrice = Number(holding.cur_prc);
+    // 계좌평가잔고내역요청(kt00018) 응답에 전일종가가 이미 들어 있어서(pred_close_pric),
+    // KIS와 달리 전일대비용으로 API를 더 부를 필요가 없다.
+    const prevClose = Number(holding.pred_close_pric);
     const stkCd = String(holding.stk_cd).replace(/^A/, "");
     rows.push({
       broker: "Kiwoom",
@@ -322,6 +368,8 @@ async function fetchKiwoomSnapshot() {
       quantity: qty,
       avg_price: avgPrice,
       current_price: currentPrice,
+      prev_close: prevClose,
+      krw_prev_close: prevClose,
       currency: "KRW",
       krw_avg_value: avgPrice * qty,
       krw_current_value: currentPrice * qty,

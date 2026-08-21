@@ -223,6 +223,7 @@ svg.fg-chart {
 
 .balance-table .pos { color: var(--diverge-red); font-weight: 600; }   /* 국내 증권가 관례: 상승/수익 = 빨강 */
 .balance-table .neg { color: var(--diverge-blue); font-weight: 600; } /* 하락/손실 = 파랑 */
+.day-change { font-size: 12px; font-weight: 500; white-space: nowrap; }
 .balance-asof { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
 .balance-currency-row { flex-wrap: wrap; }
 .balance-currency-row .balance-refresh-btn {

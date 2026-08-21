@@ -750,6 +750,17 @@ async function fetchBalanceHistory() {
   }
 }
 
+// 현재가 옆에 붙는 "전일대비" — prevClose가 없으면(예: 옛날에 저장된 행이라 아직
+// 채워지지 않음, 또는 KIS 전일종가 조회가 실패함) 조용히 빈 문자열을 반환한다.
+function dayChangeHtml(current, prevClose, formatFn) {
+  if (prevClose == null || !(prevClose > 0)) return "";
+  const diff = current - prevClose;
+  const rate = (diff / prevClose) * 100;
+  const cls = diff > 0 ? "pos" : diff < 0 ? "neg" : "";
+  const arrow = diff > 0 ? "▲" : diff < 0 ? "▼" : "-";
+  return ` <span class="day-change ${cls}">${arrow}${formatFn(Math.abs(diff))} (${diff >= 0 ? "+" : ""}${rate.toFixed(2)}%)</span>`;
+}
+
 function renderBalanceRowsFor(broker) {
   const tbody = document.getElementById(`balance-body-${broker}`);
   if (!tbody) return;
@@ -758,15 +769,17 @@ function renderBalanceRowsFor(broker) {
   for (const r of balanceData[broker].rows) {
     const isKrwView = currency === "KRW" || (currency === "NATIVE" && r.currency === "KRW");
     const nativeSymbol = r.currency === "USD" ? "$" : "";
-    let qty, avg, cur, pnl, rate;
+    let qty, avg, cur, pnl, rate, dayChange;
 
     if (isKrwView) {
       qty = Number(r.quantity).toLocaleString("ko-KR");
       avg = formatMoney(r.krw_avg_value / r.quantity);
-      cur = formatMoney(r.krw_current_value / r.quantity);
+      const curValue = r.krw_current_value / r.quantity;
+      cur = formatMoney(curValue);
       pnl = r.krw_current_value - r.krw_avg_value;
       rate = r.krw_avg_value > 0 ? (pnl / r.krw_avg_value) * 100 : 0;
       pnl = `${pnl >= 0 ? "+" : ""}${formatMoney(pnl)}`;
+      dayChange = dayChangeHtml(curValue, r.krw_prev_close, (v) => `${formatMoney(v)}원`);
     } else {
       qty = Number(r.quantity).toLocaleString("ko-KR");
       avg = `${nativeSymbol}${Number(r.avg_price).toLocaleString("ko-KR")}`;
@@ -775,6 +788,10 @@ function renderBalanceRowsFor(broker) {
       rate = r.avg_price > 0 ? ((r.current_price - r.avg_price) / r.avg_price) * 100 : 0;
       const sign = nativePnl >= 0 ? "+" : "-";
       pnl = `${sign}${nativeSymbol}${Math.abs(nativePnl).toLocaleString("ko-KR", { maximumFractionDigits: 2 })}`;
+      dayChange = dayChangeHtml(
+        r.current_price, r.prev_close,
+        (v) => `${nativeSymbol}${v.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}`
+      );
     }
 
     let krwHint = "";
@@ -788,7 +805,7 @@ function renderBalanceRowsFor(broker) {
       <td>${r.label}</td>
       <td>${qty}</td>
       <td>${avg}</td>
-      <td>${cur}${krwHint}</td>
+      <td>${cur}${dayChange}${krwHint}</td>
       <td class="${rate >= 0 ? "pos" : "neg"}">${pnl}</td>
       <td class="${rate >= 0 ? "pos" : "neg"}">${rate >= 0 ? "+" : ""}${rate.toFixed(2)}%</td>
     `;
