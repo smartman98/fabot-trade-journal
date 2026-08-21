@@ -692,7 +692,7 @@ function buildMiniLineChartSvg(points) {
   const plotH = H - PAD.top - PAD.bottom;
 
   if (points.length === 0) {
-    return `<svg viewBox="0 0 ${W} ${H}"><text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="var(--text-muted)" font-size="13">아직 쌓인 데이터가 없습니다(장 마감 무렵부터 하루 1건씩 쌓입니다)</text></svg>`;
+    return `<svg viewBox="0 0 ${W} ${H}"><text x="${W / 2}" y="${H / 2}" text-anchor="middle" fill="var(--text-muted)" font-size="13">아직 쌓인 데이터가 없습니다</text></svg>`;
   }
 
   const values = points.map((p) => p.value);
@@ -709,8 +709,16 @@ function buildMiniLineChartSvg(points) {
   const path = points.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
   const zeroY = y(0).toFixed(1);
 
+  // "오늘"(live) 점은 확정된 값이 아니라 지금 이 순간 값이라, 속이 빈 링으로 그려서
+  // 나머지 확정된 날짜들(채워진 점)과 구별한다 — 자정이 지나면 채워진 점으로 바뀐다.
   const dots = points
-    .map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.value).toFixed(1)}" r="3" fill="${p.value >= 0 ? "var(--diverge-red)" : "var(--diverge-blue)"}" />`)
+    .map((p, i) => {
+      const color = p.value >= 0 ? "var(--diverge-red)" : "var(--diverge-blue)";
+      const cx = x(i).toFixed(1), cy = y(p.value).toFixed(1);
+      return p.live
+        ? `<circle cx="${cx}" cy="${cy}" r="4" fill="var(--diverge-neutral)" stroke="${color}" stroke-width="2" />`
+        : `<circle cx="${cx}" cy="${cy}" r="3" fill="${color}" />`;
+    })
     .join("");
 
   const firstLabel = points[0].label;
@@ -727,6 +735,17 @@ function buildMiniLineChartSvg(points) {
   `;
 }
 
+// 자정(00:00 KST)이 지나면 서버가 "어제" 몫을 balance_history에 확정해서 남기고,
+// "오늘" 자리는 이 표에 아예 없다 — 화면이 지금 값(summary)으로 매번 새로 그린다.
+// 그래서 오늘 날짜 라벨이 항상 마지막 칸에 붙고, 시간이 지나며 값만 위아래로
+// 바뀌다가 다음날 자정에 확정되면 balance_history 쪽으로 넘어간다.
+function todayKstLabel() {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const mm = String(kst.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(kst.getUTCDate()).padStart(2, "0");
+  return `${mm}-${dd}`;
+}
+
 function renderBalanceChart(broker) {
   const wrap = document.getElementById(`balance-chart-${broker}`);
   if (!wrap) return;
@@ -736,6 +755,17 @@ function renderBalanceChart(broker) {
     label: h.snapshot_date.slice(5), // MM-DD만
     value: metric === "rate" ? Number(h.krw_profit_rate) : Number(h.krw_profit),
   }));
+
+  const summary = balanceData[broker] && balanceData[broker].summary;
+  const todayLabel = todayKstLabel();
+  if (summary && points[points.length - 1]?.label !== todayLabel) {
+    points.push({
+      label: todayLabel,
+      value: metric === "rate" ? summary.krwProfitRate : summary.krwProfit,
+      live: true,
+    });
+  }
+
   wrap.innerHTML = buildMiniLineChartSvg(points);
 }
 

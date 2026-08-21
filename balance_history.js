@@ -1,45 +1,34 @@
-// 계좌별 일별(종가 기준) 수익/수익률 히스토리를 balance_history 표에 쌓는다.
-// fg-index/balance_history.py(파이썬, 로컬 PC의 Task Scheduler에서 실행)와 같은 일을
-// 하지만, 이 서버(Render, 24시간 클라우드)에서 직접 돈다 — 로컬 PC가 꺼져 있으면
-// 새벽 시간대 스냅샷이 통째로 빠지는 문제(2026-08-21 실측, KIS가 며칠씩 밀림)를
-// 근본적으로 없애기 위함. 두 브로커 다 이 파일 하나로 통일한다("시간대를 둘 다
-// 맞추고 클라우드를 기준으로 해줘" — 인선님 요청, 2026-08-21).
+// 계좌별 일별 수익/수익률 히스토리를 balance_history 표에 쌓는다.
 //
-// 창(window) 시각은 브로커마다 다르다 — 둘 다 같은 시각에 찍으면 안 된다:
-// - Kiwoom은 국내(472150)만 보유 → 국내장 마감(15:30 KST) 무렵.
-// - KIS는 국내+해외(TQQQ) 동시 보유 → 두 다리가 다 확정되는 미국장 마감(05:00 KST)
-//   무렵이어야 진짜 "그날 마감" 값이 된다. 04:50~정오까지로 넓게 잡아서, 정확히
-//   그 순간이 아니어도(예: refresh 주기가 10분이라 몇 분 늦게 걸려도) 그날 첫 실행이
-//   놓치지 않고 잡게 한다. 클라우드는 24시간 켜져 있으니 이 창을 넓혀도 위험하지
-//   않다 — 오히려 "정확히 그 1분을 놓치면 하루 통째로 빠진다"는 취약점을 없앤다.
+// 설계(인선님 확정, 2026-08-21): "오늘" 자리는 이 표에 아예 안 남긴다. 오늘 값은
+// 시간이 지나면서 계속 바뀌는(위아래로만 움직이는) 살아있는 값이라, 서버가 아니라
+// 화면(app.js의 renderBalanceChart)이 매번 demo_balance/summary에서 실시간으로 계산해
+// 오늘 자리에 그린다. 이 파일이 하는 일은 딱 하나 — **자정(00:00 KST)이 지나 새 날이
+// 시작된 걸 감지하면, "어제" 자리를 그 순간의 값으로 확정해서(다시는 안 바뀌게) 이
+// 표에 한 줄 남기는 것**뿐이다. 그래야 "오늘 값 → 다음날 되면 확정값 → 다음 칸에
+// 새 점" 순서가 맞아떨어진다.
+//
+// 예전엔 브로커마다 "그 브로커 시장이 마감하는 시각"(KIS 05:00 / 키움 15:30)에 맞춰
+// 서로 다른 창(window)에서 찍었는데, 로컬 PC가 그 새벽 시간대엔 꺼져 있어서 KIS가
+// 며칠씩 누락되는 문제가 있었다(2026-08-21 실측). 자정 기준으로 통일하면(1) 두
+// 브로커가 항상 같은 순간에 확정되고(2) 이 서버가 24시간 도는 클라우드라 자정을
+// 놓칠 일이 없다("시간대를 둘 다 맞추고 클라우드를 기준으로 해줘" 요청 그대로).
 function nowKst() {
   return new Date(Date.now() + 9 * 60 * 60 * 1000);
 }
 
-function isInSnapshotWindow(broker, now) {
-  const hour = now.getUTCHours(); // now가 이미 KST로 9시간 밀려 있으므로 getUTC*를 "KST 시각"으로 그대로 씀
-  const minute = now.getUTCMinutes();
-  if (broker === "Kiwoom") return hour === 15 && minute >= 20;
-  if (broker === "KIS") {
-    if (hour < 4 || hour >= 12) return false;
-    if (hour === 4 && minute < 50) return false;
-    return true;
-  }
-  return false;
+// getUTC*를 쓰는 이유: nowKst()가 이미 실제 시각에 9시간을 더해뒀으므로, 그 결과의
+// UTC 필드를 읽으면 "KST 시각"을 그대로 얻는다(로컬 Date 객체의 타임존 보정을 피하려
+// 일부러 UTC 필드로 다룬다).
+function isJustAfterMidnightKst(now) {
+  return now.getUTCHours() === 0 && now.getUTCMinutes() < 20; // 10분 주기로 도니 한 번은 반드시 걸린다
 }
 
-// KIS는 05:00 KST 무렵(또는 그 이후 정오까지) 찍는데, 이건 "그날(한국시간 기준
-// 어제 낮)의 마감"을 뜻한다 — 미국장이 한국시간 밤~새벽에 걸치므로, 정오 전에
-// 찍어도 날짜는 전날로 남긴다.
-function snapshotDateFor(broker, now) {
-  const d = new Date(now);
-  if (broker === "KIS" && d.getUTCHours() < 12) {
-    d.setUTCDate(d.getUTCDate() - 1);
-  }
+function ymd(d) {
   return d.toISOString().slice(0, 10);
 }
 
-async function hasSnapshotToday(supabase, broker, snapshotDate) {
+async function hasSnapshot(supabase, broker, snapshotDate) {
   const { data, error } = await supabase
     .from("balance_history")
     .select("broker")
@@ -51,16 +40,17 @@ async function hasSnapshotToday(supabase, broker, snapshotDate) {
 }
 
 // rows: fetchLiveSnapshot()이 반환한 그 브로커의 rows(krw_avg_value/krw_current_value 포함).
-// 창 시간이 아니거나 오늘 이미 남겼으면 조용히 건너뛴다 — maybe_snapshot(broker, rows)
-// 자체가 실패해도(예: Supabase 일시 오류) 잔고 갱신 자체가 죽으면 안 되므로, 호출부에서
-// try/catch로 감싸 쓴다.
+// 자정 직후(00:00~00:19 KST)가 아니거나 어제 몫이 이미 있으면 조용히 건너뛴다 — 실패해도
+// (예: Supabase 일시 오류) 잔고 갱신 자체가 죽으면 안 되므로, 호출부에서 try/catch로 감싸 쓴다.
 async function maybeSnapshot(supabase, broker, rows) {
   if (!rows || rows.length === 0) return;
   const now = nowKst();
-  if (!isInSnapshotWindow(broker, now)) return;
+  if (!isJustAfterMidnightKst(now)) return;
 
-  const snapshotDate = snapshotDateFor(broker, now);
-  if (await hasSnapshotToday(supabase, broker, snapshotDate)) return;
+  const yesterday = new Date(now);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const snapshotDate = ymd(yesterday);
+  if (await hasSnapshot(supabase, broker, snapshotDate)) return;
 
   const krwAvgTotal = rows.reduce((sum, r) => sum + Number(r.krw_avg_value), 0);
   const krwCurrentTotal = rows.reduce((sum, r) => sum + Number(r.krw_current_value), 0);
@@ -76,7 +66,7 @@ async function maybeSnapshot(supabase, broker, rows) {
     krw_profit_rate: krwProfitRate,
   });
   if (error) throw new Error(error.message);
-  console.log(`일별 스냅샷 저장 완료 (${broker}, ${snapshotDate}): 수익 ${krwProfit.toFixed(0)}원, 수익률 ${krwProfitRate.toFixed(2)}%`);
+  console.log(`일별 스냅샷 확정 (${broker}, ${snapshotDate}): 수익 ${krwProfit.toFixed(0)}원, 수익률 ${krwProfitRate.toFixed(2)}%`);
 }
 
-module.exports = { maybeSnapshot, isInSnapshotWindow, snapshotDateFor };
+module.exports = { maybeSnapshot };
