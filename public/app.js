@@ -684,10 +684,17 @@ const balanceCurrencyByBroker = {}; // broker -> "KRW" | "NATIVE" | "ALL"
 let balanceHistoryData = {}; // { KIS: [{snapshot_date, krw_profit, krw_profit_rate, ...}], Kiwoom: [...] }
 const balanceMetricByBroker = {}; // broker -> "rate" | "profit"
 
+const MINI_CHART_W = 640, MINI_CHART_H = 200;
+const MINI_CHART_PAD = { top: 14, right: 12, bottom: 20, left: 46 };
+
 // 값 배열을 간단한 SVG 꺾은선 그래프로 그린다(F&G 차트처럼 0~100 고정범위가 아니라
 // 데이터 최소/최대에 맞춰 자동으로 축을 잡아야 해서 별도로 만듦 — 음수(손실)도 나올 수 있음).
+// F&G 차트(#chart)와 같은 크로스헤어+툴팁 패턴을 쓰되, 그 차트는 전용 #tooltip
+// 하나만 있어서 재사용이 안 된다(KIS·키움 두 계좌 차트가 동시에 화면에 떠 있을 수
+// 있어서 각자 툴팁이 필요함) — 그래서 svg와 툴팁 div를 한 덩어리로 같이 반환하고,
+// wireMiniLineChartHover()가 그 안에서 필요한 엘리먼트를 찾아 이벤트를 붙인다.
 function buildMiniLineChartSvg(points) {
-  const W = 640, H = 200, PAD = { top: 14, right: 12, bottom: 20, left: 46 };
+  const W = MINI_CHART_W, H = MINI_CHART_H, PAD = MINI_CHART_PAD;
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
 
@@ -725,14 +732,83 @@ function buildMiniLineChartSvg(points) {
   const lastLabel = points[points.length - 1].label;
 
   return `
-    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="일별 수익 추이 차트">
-      <line x1="${PAD.left}" y1="${zeroY}" x2="${W - PAD.right}" y2="${zeroY}" stroke="var(--baseline)" stroke-dasharray="3,3" />
-      <path d="${path}" fill="none" stroke="var(--cat-2)" stroke-width="2" />
-      ${dots}
-      <text x="${PAD.left}" y="${H - 4}" font-size="11" fill="var(--text-muted)">${firstLabel}</text>
-      <text x="${W - PAD.right}" y="${H - 4}" font-size="11" fill="var(--text-muted)" text-anchor="end">${lastLabel}</text>
-    </svg>
+    <div style="position:relative;">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="일별 수익 추이 차트" class="mini-line-chart">
+        <line x1="${PAD.left}" y1="${zeroY}" x2="${W - PAD.right}" y2="${zeroY}" stroke="var(--baseline)" stroke-dasharray="3,3" />
+        <path d="${path}" fill="none" stroke="var(--cat-2)" stroke-width="2" />
+        ${dots}
+        <text x="${PAD.left}" y="${H - 4}" font-size="11" fill="var(--text-muted)">${firstLabel}</text>
+        <text x="${W - PAD.right}" y="${H - 4}" font-size="11" fill="var(--text-muted)" text-anchor="end">${lastLabel}</text>
+        <line class="mini-chart-hover-line" x1="0" y1="${PAD.top}" x2="0" y2="${H - PAD.bottom}" stroke="var(--text-muted)" stroke-dasharray="2,2" visibility="hidden" />
+        <circle class="mini-chart-hover-dot" r="5" stroke-width="2" fill="var(--surface-1)" visibility="hidden" />
+        <rect class="mini-chart-hit-rect" x="0" y="0" width="${W}" height="${H}" fill="transparent" style="cursor:crosshair;" />
+      </svg>
+      <div class="tooltip mini-chart-tooltip"></div>
+    </div>
   `;
+}
+
+// 마우스가 선 위 어디에 있든(정확히 점 위가 아니어도) 가장 가까운 날짜의 값으로
+// "스냅"해서 보여준다 — F&G 차트(showTooltipAt)와 같은 방식.
+function wireMiniLineChartHover(wrap, points) {
+  if (points.length === 0) return;
+  const svg = wrap.querySelector(".mini-line-chart");
+  const hitRect = wrap.querySelector(".mini-chart-hit-rect");
+  const hoverLine = wrap.querySelector(".mini-chart-hover-line");
+  const hoverDot = wrap.querySelector(".mini-chart-hover-dot");
+  const tooltip = wrap.querySelector(".mini-chart-tooltip");
+  if (!svg || !hitRect) return;
+
+  const W = MINI_CHART_W, H = MINI_CHART_H, PAD = MINI_CHART_PAD;
+  const plotW = W - PAD.left - PAD.right;
+  const plotH = H - PAD.top - PAD.bottom;
+  const values = points.map((p) => p.value);
+  let min = Math.min(...values, 0);
+  let max = Math.max(...values, 0);
+  if (min === max) { min -= 1; max += 1; }
+  const span = max - min;
+  min -= span * 0.1;
+  max += span * 0.1;
+  const x = (i) => (points.length <= 1 ? PAD.left : PAD.left + (i / (points.length - 1)) * plotW);
+  const y = (v) => PAD.top + (1 - (v - min) / (max - min)) * plotH;
+
+  function showAt(clientX) {
+    const rect = svg.getBoundingClientRect();
+    const relX = ((clientX - rect.left) / rect.width) * W;
+    let idx = points.length <= 1 ? 0 : Math.round(((relX - PAD.left) / plotW) * (points.length - 1));
+    idx = Math.max(0, Math.min(points.length - 1, idx));
+
+    const p = points[idx];
+    const px = x(idx), py = y(p.value);
+    hoverLine.setAttribute("x1", px);
+    hoverLine.setAttribute("x2", px);
+    hoverLine.setAttribute("visibility", "visible");
+    hoverDot.setAttribute("cx", px);
+    hoverDot.setAttribute("cy", py);
+    hoverDot.setAttribute("stroke", p.value >= 0 ? "var(--diverge-red)" : "var(--diverge-blue)");
+    hoverDot.setAttribute("visibility", "visible");
+
+    tooltip.style.opacity = "1";
+    tooltip.innerHTML = `
+      <div>${p.label}${p.live ? " (실시간)" : ""}</div>
+      <div class="tt-value">${p.rate >= 0 ? "+" : ""}${p.rate.toFixed(2)}%</div>
+      <div>${p.profit >= 0 ? "+" : ""}${formatMoney(p.profit)}원</div>
+    `;
+
+    const scaleX = rect.width / W;
+    const scaleY = rect.height / H;
+    tooltip.style.left = Math.min(px * scaleX + 10, rect.width - 100) + "px";
+    tooltip.style.top = Math.max(py * scaleY - 55, 0) + "px";
+  }
+
+  function hide() {
+    hoverLine.setAttribute("visibility", "hidden");
+    hoverDot.setAttribute("visibility", "hidden");
+    tooltip.style.opacity = "0";
+  }
+
+  hitRect.addEventListener("pointermove", (e) => showAt(e.clientX));
+  hitRect.addEventListener("pointerleave", hide);
 }
 
 // 자정(00:00 KST)이 지나면 서버가 "어제" 몫을 balance_history에 확정해서 남기고,
@@ -751,8 +827,12 @@ function renderBalanceChart(broker) {
   if (!wrap) return;
   const metric = balanceMetricByBroker[broker] || "rate";
   const history = balanceHistoryData[broker] || [];
+  // rate/profit을 둘 다 들고 있어야 툴팁에 두 값을 같이 보여줄 수 있다(화면의
+  // "수익률"/"수익(원)" 토글은 선 위치를 뭘로 그릴지만 정할 뿐, 툴팁은 항상 둘 다 보여줌).
   const points = history.map((h) => ({
     label: h.snapshot_date.slice(5), // MM-DD만
+    rate: Number(h.krw_profit_rate),
+    profit: Number(h.krw_profit),
     value: metric === "rate" ? Number(h.krw_profit_rate) : Number(h.krw_profit),
   }));
 
@@ -761,12 +841,15 @@ function renderBalanceChart(broker) {
   if (summary && points[points.length - 1]?.label !== todayLabel) {
     points.push({
       label: todayLabel,
+      rate: summary.krwProfitRate,
+      profit: summary.krwProfit,
       value: metric === "rate" ? summary.krwProfitRate : summary.krwProfit,
       live: true,
     });
   }
 
   wrap.innerHTML = buildMiniLineChartSvg(points);
+  wireMiniLineChartHover(wrap, points);
 }
 
 async function fetchBalanceHistory() {
