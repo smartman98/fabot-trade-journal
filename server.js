@@ -3,6 +3,7 @@ const path = require("path");
 const express = require("express");
 const { createClient } = require("@supabase/supabase-js");
 const { fetchLiveSnapshot } = require("./broker_live");
+const { maybeSnapshot } = require("./balance_history");
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
@@ -182,10 +183,16 @@ app.get("/api/cash", async (req, res) => {
 });
 
 // 잔고 실시간 새로고침 — 저장된 스냅샷을 그냥 다시 읽는 게 아니라, KIS/Kiwoom API를 지금
-// 이 자리에서 직접 호출해 최신 보유종목/현금을 받아와 demo_balance/demo_cash에 upsert한다.
-// 두 증권사 중 하나만 API키가 설정돼 있거나 하나만 실패해도 나머지는 정상 반영되고,
-// 실패한 브로커는 errors에 이유와 함께 담겨 응답한다(화면은 그 브로커만 이전 값 유지).
-app.post("/api/balance/refresh", async (req, res) => {
+// 이 자리에서 직접 호출해 최신 보유종목/현금을 받아와 demo_balance/demo_cash에 upsert하고,
+// 일별 히스토리 스냅샷(balance_history)도 시간이 맞으면 같이 남긴다. 두 증권사 중 하나만
+// API키가 설정돼 있거나 하나만 실패해도 나머지는 정상 반영되고, 실패한 브로커는 errors에
+// 이유와 함께 담긴다(화면은 그 브로커만 이전 값 유지).
+//
+// 이 서버(Render, 24시간 클라우드)에서 직접 도는 게 핵심이다 — 예전엔 로컬 PC의 Task
+// Scheduler가 이 일을 했는데, 새벽 시간대(KIS 스냅샷 창)에 PC가 꺼져 있어서 며칠씩
+// 스냅샷이 통째로 빠지는 문제가 있었다(2026-08-21 실측). 아래 setInterval로 클라이언트
+// 접속 여부와 무관하게 주기적으로 스스로 돈다.
+async function refreshBalances() {
   const snapshot = await fetchLiveSnapshot(supabase);
   const nowIso = new Date().toISOString();
   const updated = [];
@@ -203,6 +210,13 @@ app.post("/api/balance/refresh", async (req, res) => {
         errors[broker] = error.message;
         continue;
       }
+      try {
+        await maybeSnapshot(supabase, broker, result.rows);
+      } catch (err) {
+        // 일별 히스토리 저장 실패는 부가 기능 오류다 — 잔고 자체는 이미 갱신됐으니
+        // 이걸로 전체 요청을 실패로 돌리지 않는다.
+        console.error(`[balance_history] ${broker} 스냅샷 저장 실패:`, err.message);
+      }
     }
     const { error: cashError } = await supabase
       .from("demo_cash")
@@ -214,8 +228,17 @@ app.post("/api/balance/refresh", async (req, res) => {
     updated.push(broker);
   }
 
-  res.json({ updated, errors });
+  return { updated, errors };
+}
+
+app.post("/api/balance/refresh", async (req, res) => {
+  res.json(await refreshBalances());
 });
+
+const BALANCE_AUTO_REFRESH_MS = 10 * 60 * 1000; // 로컬 파이썬 스케줄 잡과 같은 10분 주기
+setInterval(() => {
+  refreshBalances().catch((err) => console.error("[balance] 자동 새로고침 실패:", err.message));
+}, BALANCE_AUTO_REFRESH_MS);
 
 // 목록 조회 + 요약 통계
 app.get("/api/trades", async (req, res) => {
