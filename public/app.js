@@ -790,7 +790,7 @@ function wireMiniLineChartHover(wrap, points) {
 
     tooltip.style.opacity = "1";
     tooltip.innerHTML = `
-      <div>${p.label}${p.live ? " (실시간)" : ""}</div>
+      <div>${p.label}</div>
       <div class="tt-value">${p.rate >= 0 ? "+" : ""}${p.rate.toFixed(2)}%</div>
       <div>${p.profit >= 0 ? "+" : ""}${formatMoney(p.profit)}원</div>
     `;
