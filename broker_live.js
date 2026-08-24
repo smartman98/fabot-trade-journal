@@ -90,21 +90,21 @@ async function kisDomesticAskingPrice(pdno) {
 }
 
 // 전일종가 조회용 — 호가(asking-price) 응답엔 전일대비 정보가 없어서 현재가 시세
-// (inquire-price)를 한 번 더 부른다. prdy_vrss_sign: 1=상한/2=상승/3=보합/4=하한/5=하락
-// (KIS 공식 코드) — stck_prpr(그 응답 자신의 현재가) 기준으로 전일종가를 역산해두면,
-// 실제 화면에 표시하는 현재가(매도1호가)가 stck_prpr와 살짝 달라도 "표시된 현재가 -
-// 전일종가"로 다시 빼서 전일대비를 일관되게 계산할 수 있다.
+// (inquire-price)를 한 번 더 부른다. stck_sdpr(전일 기준가)를 그대로 쓴다 — 이 필드가
+// KIS가 이미 계산해서 주는 전일종가라 역산이 필요 없다.
+//
+// [2026-08-24 수정] 원래는 stck_prpr - signedVrss로 역산했는데, prdy_vrss가 KIS에서
+// 이미 부호 포함 값으로 오는 걸(예: 하락일에 "-475") 몰라서 prdy_vrss_sign으로 부호를
+// 한 번 더 적용해 하락일에 부호가 두 번 뒤집히는 버그가 있었다(하락 385원인데 +385원
+// 상승으로 표시됨 — 실시간 조회로 확인: stck_prpr=20645, prdy_vrss="-475", sign="5",
+// stck_sdpr=21120). stck_sdpr을 직접 쓰면 이 문제 자체가 없다.
 async function kisDomesticPrevClose(pdno) {
   const data = await kisGet(
     "/uapi/domestic-stock/v1/quotations/inquire-price",
     "FHKST01010100",
     { FID_COND_MRKT_DIV_CODE: "J", FID_INPUT_ISCD: pdno }
   );
-  const stckPrpr = Number(data.output.stck_prpr);
-  const vrss = Number(data.output.prdy_vrss);
-  const sign = data.output.prdy_vrss_sign;
-  const signedVrss = sign === "1" || sign === "2" ? vrss : sign === "4" || sign === "5" ? -vrss : 0;
-  return stckPrpr - signedVrss;
+  return Number(data.output.stck_sdpr);
 }
 
 // 해외는 현재가상세(price-detail)의 base가 그 자체로 기준가(전일종가)라 부호 계산이 필요 없다.
