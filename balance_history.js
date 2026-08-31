@@ -20,8 +20,17 @@ function nowKst() {
 // getUTC*를 쓰는 이유: nowKst()가 이미 실제 시각에 9시간을 더해뒀으므로, 그 결과의
 // UTC 필드를 읽으면 "KST 시각"을 그대로 얻는다(로컬 Date 객체의 타임존 보정을 피하려
 // 일부러 UTC 필드로 다룬다).
+//
+// 2026-08-31: 원래 19분 창(00:00~00:19)이었는데, cron-job.org의 00:05 크론이 11일
+// 연속 100% 실패했던 걸 실측으로 확인함 — 원인은 무료 Render 서버가 잠들어 있다가
+// 그 순간 깨어나느라 503으로 즉시 실패하는 것(케이크런 자체는 정확한 시각에 잘
+// 실행되고 있었음). keep-alive 크론(10분 간격)을 새로 추가해서 서버가 안 잠들게
+// 했지만, 혹시 keep-alive가 밀리거나 실패해도 자정 창 자체를 넉넉히 잡아두면 다음
+// 10분 주기 안에 또 기회가 있으므로 이중 안전장치로 60분까지 늘린다. 국내 커버드콜은
+// 00:00~01:00 KST 사이엔 국내장이 열려있지 않아(09:00 개장) 이 시간대 값이 "어제
+// 종가"에서 안 움직이므로 넓혀도 안전하다.
 function isJustAfterMidnightKst(now) {
-  return now.getUTCHours() === 0 && now.getUTCMinutes() < 20; // 10분 주기로 도니 한 번은 반드시 걸린다
+  return now.getUTCHours() === 0; // 00:00~00:59 KST — 10분 주기로 도니 여러 번 기회가 있다
 }
 
 function ymd(d) {
@@ -46,6 +55,9 @@ async function maybeSnapshot(supabase, broker, rows) {
   if (!rows || rows.length === 0) return;
   const now = nowKst();
   if (!isJustAfterMidnightKst(now)) return;
+  // 다음에 또 며칠씩 누락되면 cron-job.org 대시보드 없이도 Render 로그만으로 원인을
+  // 바로 확인할 수 있도록 남긴다(2026-08-31, 11일 연속 무응답 사고 재발 방지용).
+  console.log(`[balance_history] 자정 창 진입 감지 (${broker}), KST now=${now.toISOString()}`);
 
   const yesterday = new Date(now);
   yesterday.setUTCDate(yesterday.getUTCDate() - 1);
