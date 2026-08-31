@@ -80,31 +80,27 @@ async function kisGet(path, trId, params) {
   return data;
 }
 
-async function kisDomesticAskingPrice(pdno) {
-  const data = await kisGet(
-    "/uapi/domestic-stock/v1/quotations/inquire-asking-price-exp-ccn",
-    "FHKST01010200",
-    { FID_COND_MRKT_DIV_CODE: "J", FID_INPUT_ISCD: pdno }
-  );
-  return data.output1;
-}
-
-// 전일종가 조회용 — 호가(asking-price) 응답엔 전일대비 정보가 없어서 현재가 시세
-// (inquire-price)를 한 번 더 부른다. stck_sdpr(전일 기준가)를 그대로 쓴다 — 이 필드가
-// KIS가 이미 계산해서 주는 전일종가라 역산이 필요 없다.
+// 현재가+전일종가를 한 번에 조회한다 — inquire-price 응답에 stck_prpr(현재가/최종
+// 체결가)와 stck_sdpr(전일 기준가)가 둘 다 들어있다.
 //
-// [2026-08-24 수정] 원래는 stck_prpr - signedVrss로 역산했는데, prdy_vrss가 KIS에서
-// 이미 부호 포함 값으로 오는 걸(예: 하락일에 "-475") 몰라서 prdy_vrss_sign으로 부호를
-// 한 번 더 적용해 하락일에 부호가 두 번 뒤집히는 버그가 있었다(하락 385원인데 +385원
-// 상승으로 표시됨 — 실시간 조회로 확인: stck_prpr=20645, prdy_vrss="-475", sign="5",
-// stck_sdpr=21120). stck_sdpr을 직접 쓰면 이 문제 자체가 없다.
-async function kisDomesticPrevClose(pdno) {
+// [2026-08-24 수정] 전일종가는 원래 stck_prpr - signedVrss로 역산했는데, prdy_vrss가
+// KIS에서 이미 부호 포함 값으로 오는 걸(예: 하락일에 "-475") 몰라서 prdy_vrss_sign으로
+// 부호를 한 번 더 적용해 하락일에 부호가 두 번 뒤집히는 버그가 있었다(하락 385원인데
+// +385원 상승으로 표시됨 — 실시간 조회로 확인: stck_prpr=20645, prdy_vrss="-475",
+// sign="5", stck_sdpr=21120). stck_sdpr을 직접 쓰면 이 문제 자체가 없다.
+//
+// [2026-08-31 수정] currentPrice(현재가)는 원래 이 함수가 아니라 kisDomesticAskingPrice()의
+// askp1(매도호가, 지금 팔겠다고 걸어둔 가격)을 썼는데, 이게 장 마감 뒤에도 오래된 호가가
+// 남아있어서 실제 체결가와 몇 원씩 차이가 났다(키움은 cur_prc로 진짜 체결가를 써서 둘이
+// 안 맞았음 — 인선님이 대시보드에서 5원 차이로 발견, 2026-08-31). stck_prpr이 실제
+// 최종 체결가라 이걸 현재가로 써야 두 증권사가 항상 같은 값을 보여준다.
+async function kisDomesticQuote(pdno) {
   const data = await kisGet(
     "/uapi/domestic-stock/v1/quotations/inquire-price",
     "FHKST01010100",
     { FID_COND_MRKT_DIV_CODE: "J", FID_INPUT_ISCD: pdno }
   );
-  return Number(data.output.stck_sdpr);
+  return { currentPrice: Number(data.output.stck_prpr), prevClose: Number(data.output.stck_sdpr) };
 }
 
 // 해외는 현재가상세(price-detail)의 base가 그 자체로 기준가(전일종가)라 부호 계산이 필요 없다.
@@ -209,17 +205,16 @@ async function fetchKisSnapshot(supabase) {
 
   const domestic = await kisGetHolding(COVERED_CALL_STOCK_CODE);
   if (domestic && domestic.qty > 0) {
-    const book = await kisDomesticAskingPrice(COVERED_CALL_STOCK_CODE);
-    let currentPrice = Number(book.askp1);
+    let currentPrice = null;
+    let prevClose = null;
+    try {
+      const quote = await kisDomesticQuote(COVERED_CALL_STOCK_CODE);
+      currentPrice = quote.currentPrice;
+      prevClose = quote.prevClose;
+    } catch { /* 무시 — 아래 fallback으로 처리 */ }
     if (!(currentPrice > 0)) {
       currentPrice = (await previousCurrentPrice(supabase, "KIS", COVERED_CALL_STOCK_CODE)) ?? domestic.avg_price;
     }
-    // 전일대비 표시는 부가 정보라, 이 호출이 실패해도(예: 장 시작 전 데이터 없음)
-    // 잔고 조회 자체가 죽으면 안 된다 — 실패하면 조용히 null로 둔다.
-    let prevClose = null;
-    try {
-      prevClose = await kisDomesticPrevClose(COVERED_CALL_STOCK_CODE);
-    } catch { /* 무시 — 전일대비 칸만 비게 됨 */ }
     rows.push({
       broker: "KIS",
       ticker: COVERED_CALL_STOCK_CODE,
