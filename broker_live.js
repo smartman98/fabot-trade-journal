@@ -200,7 +200,7 @@ async function previousCurrentPrice(supabase, broker, ticker) {
   return data ? Number(data.current_price) : null;
 }
 
-async function fetchKisSnapshot(supabase) {
+async function fetchKisSnapshot(supabase, kiwoomCoveredCallPrice) {
   const rows = [];
 
   const domestic = await kisGetHolding(COVERED_CALL_STOCK_CODE);
@@ -212,7 +212,13 @@ async function fetchKisSnapshot(supabase) {
       currentPrice = quote.currentPrice;
       prevClose = quote.prevClose;
     } catch { /* 무시 — 아래 fallback으로 처리 */ }
-    if (!(currentPrice > 0)) {
+    // [2026-09-02 수정] 2026-08-31에 stck_prpr(최종 체결가)로 맞췄는데도 키움 cur_prc와
+    // 몇 원씩 계속 어긋났다 — 같은 KRX 상장 472150이지만 KIS/키움 API를 서로 다른 시점에
+    // 호출하니 그 사이 체결이 나면 값이 달라진다(19,620원 vs 19,625원, 대시보드에서 재발견).
+    // 두 증권사가 항상 같은 값을 보여줘야 하므로, 키움 조회값이 있으면 그걸 그대로 쓴다.
+    if (kiwoomCoveredCallPrice > 0) {
+      currentPrice = kiwoomCoveredCallPrice;
+    } else if (!(currentPrice > 0)) {
       currentPrice = (await previousCurrentPrice(supabase, "KIS", COVERED_CALL_STOCK_CODE)) ?? domestic.avg_price;
     }
     rows.push({
@@ -383,16 +389,21 @@ async function fetchKiwoomSnapshot() {
 async function fetchLiveSnapshot(supabase) {
   const result = {};
 
-  try {
-    result.KIS = { ...(await fetchKisSnapshot(supabase)), error: null };
-  } catch (err) {
-    result.KIS = { rows: null, cashKrw: null, error: err.message };
-  }
-
+  // 키움을 먼저 조회한다 — KIS 쪽 472150 현재가를 키움 값으로 맞추려면 그 값이 먼저 있어야 한다.
   try {
     result.Kiwoom = { ...(await fetchKiwoomSnapshot()), error: null };
   } catch (err) {
     result.Kiwoom = { rows: null, cashKrw: null, error: err.message };
+  }
+
+  const kiwoomCoveredCallPrice = result.Kiwoom.rows?.find(
+    (r) => r.ticker === COVERED_CALL_STOCK_CODE
+  )?.current_price;
+
+  try {
+    result.KIS = { ...(await fetchKisSnapshot(supabase, kiwoomCoveredCallPrice)), error: null };
+  } catch (err) {
+    result.KIS = { rows: null, cashKrw: null, error: err.message };
   }
 
   return result;
