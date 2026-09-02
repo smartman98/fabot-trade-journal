@@ -192,7 +192,21 @@ app.get("/api/cash", async (req, res) => {
 // Scheduler가 이 일을 했는데, 새벽 시간대(KIS 스냅샷 창)에 PC가 꺼져 있어서 며칠씩
 // 스냅샷이 통째로 빠지는 문제가 있었다(2026-08-21 실측). 아래 setInterval로 클라이언트
 // 접속 여부와 무관하게 주기적으로 스스로 돈다.
+// 자동 새로고침(10분 주기)과 수동 새로고침 버튼이 겹쳐 동시에 실행되면, 키움은 API
+// 호출이 적어 빨리 끝나고 KIS는 순차 호출이 많아 늦게 끝나서 — 나중에 끝난 쪽이 그 사이
+// 달라진 시세로 덮어써 버려, 같은 요청 안에서 맞춘 472150 현재가가 다시 어긋난다
+// (한투 19,590원 vs 키움 19,580원, 62초 시차로 재발 확인, 2026-09-02). 이미 진행 중인
+// 요청이 있으면 새로 시작하지 않고 그 결과를 같이 기다리게 해서 겹침 자체를 없앤다.
+let inFlightRefresh = null;
 async function refreshBalances() {
+  if (inFlightRefresh) return inFlightRefresh;
+  inFlightRefresh = doRefreshBalances().finally(() => {
+    inFlightRefresh = null;
+  });
+  return inFlightRefresh;
+}
+
+async function doRefreshBalances() {
   const snapshot = await fetchLiveSnapshot(supabase);
   const nowIso = new Date().toISOString();
   const updated = [];
