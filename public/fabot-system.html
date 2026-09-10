@@ -12,7 +12,7 @@
     <p class="sub">자동매매 시스템 워크플로</p>
     <p><a href="index.html">← 매매 일지로 돌아가기</a></p>
 
-    <svg viewBox="0 0 680 630" width="100%" style="max-width:640px;display:block;margin:24px auto 0;">
+    <svg viewBox="0 0 680 630" width="100%" style="max-width:900px;display:block;margin:24px auto 0;">
       <title>FABOT 자동매매 시스템 워크플로</title>
       <defs><marker id="wfArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#898781" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
 
@@ -67,6 +67,19 @@
 
       <text x="340" y="604" text-anchor="middle" font-size="11" fill="#52514e">↻ 다음 스케줄에 반복</text>
     </svg>
+
+    <div style="max-width:640px;margin:32px auto 0;">
+      <h3 style="margin:0 0 12px;">쉽게 설명하면</h3>
+      <ol style="padding-left:20px;line-height:1.9;color:var(--text-secondary);">
+        <li>정해진 시간이 되면 자동으로 시작합니다.</li>
+        <li>지금이 매매할 수 있는 시간인지 먼저 확인합니다. 아니면 여기서 멈춥니다.</li>
+        <li>매매할 수 있는 시간이면, F&amp;G 지수와 대기 기간(직전 매매 후 얼마나 지났는지)을 확인합니다.</li>
+        <li>F&amp;G 점수를 보고 살지, 팔지, 아무것도 안 할지 정합니다.</li>
+        <li>정한 대로 실제 주문을 넣습니다. 조건에 안 맞으면 아무 주문도 넣지 않습니다.</li>
+        <li>결과를 기록하고 텔레그램으로 알립니다.</li>
+        <li>다음 정해진 시간에 처음부터 다시 반복합니다.</li>
+      </ol>
+    </div>
   </div>
 </body>
 </html>
