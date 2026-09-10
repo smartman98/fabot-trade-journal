@@ -71,6 +71,21 @@ function formatMoney(n) {
   return Math.round(n).toLocaleString("ko-KR");
 }
 
+// created_at(UTC, auto_trade_loop.py가 실제 체결 시각에 기록)을 한국시간 HH:MM으로.
+// 자동매매가 아니라 수동으로 나중에 입력한 옛 기록은 created_at이 입력 시각일 뿐이라
+// 실제 체결 시각과 다를 수 있으니 값이 없을 때만 조용히 생략한다.
+function formatTradeTime(createdAt) {
+  if (!createdAt) return "";
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Seoul" });
+}
+
+function formatFg(score) {
+  if (score === null || score === undefined) return null;
+  return Math.round(score * 100) / 100;
+}
+
 function actionLabel(action) {
   if (action === "buy") return "매수";
   if (action === "sell") return "매도";
@@ -103,10 +118,13 @@ function renderTrades(trades, targetUl, emptyText) {
     ticker.textContent = t.ticker;
     const meta = document.createElement("div");
     meta.className = "trade-meta";
-    const fgText = t.fg_score !== null && t.fg_score !== undefined ? ` · F&G ${t.fg_score}` : "";
+    const fg = formatFg(t.fg_score);
+    const fgText = fg !== null ? ` · F&G ${fg}` : "";
+    const time = formatTradeTime(t.created_at);
+    const dateText = time ? `${t.trade_date} ${time}` : t.trade_date;
     meta.textContent = t.action === "dividend"
-      ? `${t.trade_date} · 세후 수령액 ${formatMoney(t.price)}원${fgText}`
-      : `${t.trade_date} · 수량 ${t.quantity} · 주가 ${formatMoney(t.price)}${fgText}`;
+      ? `${dateText} · 세후 수령액 ${formatMoney(t.price)}원${fgText}`
+      : `${dateText} · 수량 ${t.quantity} · 주가 ${formatMoney(t.price)}${fgText}`;
 
     main.appendChild(ticker);
     main.appendChild(meta);
@@ -170,10 +188,13 @@ function openEditForm(trade) {
 
 function openDetail(trade) {
   selectedTrade = trade;
-  const fgText = trade.fg_score !== null && trade.fg_score !== undefined ? trade.fg_score : "-";
+  const fg = formatFg(trade.fg_score);
+  const fgText = fg !== null ? fg : "-";
+  const time = formatTradeTime(trade.created_at);
+  const dateText = time ? `${trade.trade_date} ${time}` : trade.trade_date;
   detailBody.innerHTML = `
     <div><strong>${trade.ticker}</strong> (${actionLabel(trade.action)})</div>
-    <div>날짜: ${trade.trade_date}</div>
+    <div>날짜: ${dateText}</div>
     <div>수량: ${trade.quantity}</div>
     <div>주가: ${formatMoney(trade.price)}</div>
     <div>그때 F&G 점수: ${fgText}</div>
