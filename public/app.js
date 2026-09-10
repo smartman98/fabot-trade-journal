@@ -658,6 +658,15 @@ if (tableToggleBtn) {
   });
 }
 
+const workflowToggleBtn = document.getElementById("workflow-toggle");
+if (workflowToggleBtn) {
+  workflowToggleBtn.addEventListener("click", () => {
+    const wrap = document.getElementById("workflow-wrap");
+    wrap.hidden = !wrap.hidden;
+    workflowToggleBtn.textContent = wrap.hidden ? "FABOT System 보기" : "FABOT System 숨기기";
+  });
+}
+
 function currentActiveRange() {
   const activeBtn = filterRow && filterRow.querySelector(".filter-btn.active");
   return activeBtn ? activeBtn.dataset.range : "90";

@@ -221,6 +221,23 @@ svg.fg-chart {
   border-top: 1px solid var(--gridline);
 }
 
+.workflow-toggle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.workflow-wrap {
+  margin-top: 16px;
+  padding: 20px 0;
+  border-top: 1px solid var(--gridline);
+  border-bottom: 1px solid var(--gridline);
+}
+
 .balance-table .pos { color: var(--diverge-red); font-weight: 600; }   /* 국내 증권가 관례: 상승/수익 = 빨강 */
 .balance-table .neg { color: var(--diverge-blue); font-weight: 600; } /* 하락/손실 = 파랑 */
 .day-change { font-size: 12px; font-weight: 500; white-space: nowrap; }
