@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>백테스트 근거</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .bt-table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 16px 0 24px; }
+    .bt-table th, .bt-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--gridline); }
+    .bt-table th { color: var(--text-muted); font-weight: 500; background: var(--diverge-neutral); }
+    .bt-section { margin: 32px 0; }
+    .bt-section h2 { font-size: 1.15rem; margin: 0 0 8px; }
+    .bt-note { color: var(--text-secondary); font-size: 14px; line-height: 1.8; }
+    .bt-warn { border-left: 3px solid var(--diverge-red); padding: 10px 14px; background: var(--diverge-red-wash); font-size: 14px; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <h1>백테스트 근거</h1>
+    <p class="sub">왜 이 전략(TQQQ + 커버드콜, F&G 기반)에 투자하는가 — 2026-07-12 검증 결과</p>
+    <p><a href="index.html">← 매매 일지로 돌아가기</a></p>
+
+    <div class="bt-section">
+      <h2>전략 요약</h2>
+      <p class="bt-note">
+        두 자산이 서로 다른 역할을 한다.<br>
+        <strong>커버드콜(수비)</strong> — 나스닥100의 약 90%를 추종(베타 0.9)하면서 연 15%를 매달 배당.
+        "2세대 커버드콜"은 상승 제한된 안전자산이 아니라 실질적으로 배당 나오는 성장자산 — 실제 계좌
+        데이터로 확인됨(31개월 실측 배당수익률 13~20%/년, 누적 약 7,010만원).<br>
+        <strong>TQQQ(공격)</strong> — 3배 레버리지, F&amp;G 사이클에 따라 매매.
+      </p>
+    </div>
+
+    <div class="bt-section">
+      <h2>현재 매매 규칙</h2>
+      <table class="bt-table">
+        <thead><tr><th>조건</th><th>동작</th></tr></thead>
+        <tbody>
+          <tr><td>F&amp;G ≤ 30</td><td>TQQQ 25% 매수</td></tr>
+          <tr><td>F&amp;G ≤ 25</td><td>TQQQ 50% 매수</td></tr>
+          <tr><td>F&amp;G ≤ 20</td><td>TQQQ 100% 매수</td></tr>
+          <tr><td>F&amp;G 35~65 (평시)</td><td>커버드콜 10% 추가매수</td></tr>
+          <tr><td>F&amp;G ≥ 72</td><td>TQQQ 보유분 50% 매도</td></tr>
+          <tr><td>F&amp;G ≥ 77</td><td>TQQQ 잔량 전량 매도</td></tr>
+          <tr><td>매수/매도 후</td><td>4거래일 대기 기간</td></tr>
+        </tbody>
+      </table>
+      <p class="bt-note">2026-08-31 분기 재최적화 결과 반영(10년 블록부트스트랩 랜덤서치). 다음 재검토: 2026-11-30.</p>
+    </div>
+
+    <div class="bt-section">
+      <h2>검증 방법 3가지</h2>
+      <p class="bt-note">
+        같은 전략을 서로 다른 방법 3개로 검증했다 — 하나의 시뮬레이션만 믿지 않기 위해서다.
+      </p>
+      <table class="bt-table">
+        <thead><tr><th>방법</th><th>CAGR</th><th>MDD</th><th>비고</th></tr></thead>
+        <tbody>
+          <tr><td>30년 몬테카를로<br><span style="color:var(--text-muted)">(통계모델, 정상/스트레스 국면 전환)</span></td><td colspan="2">나스닥 CAGR 가정에 따라 크게 달라짐</td><td>가정 민감도 높음</td></tr>
+          <tr><td>실제 TQQQ 역사<br><span style="color:var(--text-muted)">(2010.2~2026.7, 16.4년, 실데이터)</span></td><td>18.8~31.5%</td><td>-40~50%대</td><td>가정별 편차 큼</td></tr>
+          <tr><td>블록부트스트랩<br><span style="color:var(--text-muted)">(실제 데이터 무작위 재조합)</span></td><td>22.4%</td><td>-48.1%</td><td>몬테카를로보다 신뢰도 높음, 원금회수확률 100%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="bt-section">
+      <h2>현실적인 기대치</h2>
+      <p class="bt-note">
+        나스닥 장기 CAGR을 <strong>14~15%</strong>로 가정(30년 전체 실측 평균 — 최근 15년만의 19.7%는
+        특수한 호황기라 장기 가정으로 쓰기엔 과대평가 위험이 있어서 배제함), MDD는 <strong>-45~50%대</strong>.<br>
+        1,000만원 → 30년 후 중간값 기준 원금의 10~25배.
+      </p>
+    </div>
+
+    <div class="bt-section">
+      <h2>배당 세금 구조 (실측)</h2>
+      <p class="bt-note">
+        2026-07-02 실제 배당입금 확인: 486290(과세 상품)은 세전 936,200원 → 세후 795,260원(15.1% 원천징수),
+        같은 날 472150 등 비과세 상품은 세전=세후. 그래서 486290 대신 472150을 실제 매매 종목으로 씀.<br>
+        1인 배당소득이 연 2,000만원을 넘으면 종합과세·건강보험 영향이 생겨서, 배당을 가족 명의로
+        분산해 각자 상한선 아래로 관리 중이다.
+      </p>
+    </div>
+
+    <div class="bt-section">
+      <h2>한계와 주의할 점</h2>
+      <div class="bt-warn">
+        <ul style="margin:0; padding-left:20px;">
+          <li>실제 자동매매 실행은 2026년 7월부터 — 아직 2개월 정도라 백테스트만큼 실전 검증된 기간은 아님.</li>
+          <li>TQQQ(3배 레버리지) 비중이 커질수록 최악 시나리오 MDD가 -60%대까지 나올 수 있음.</li>
+          <li>가격에서 역산한 계산 F&amp;G 지표는 실거래 신호로 아직 신뢰하지 않음 — 지금은 CNN 실제 원본
+              데이터를 우선 쓰고, 계산 지표는 6개월~1년 실측 대조 검증 전까지 보조용으로만 씀.</li>
+          <li>재최적화는 과최적화를 피하려고 3개월(분기)에 한 번만 함 — 그만큼 시장 변화에 대응이 느릴 수 있음.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
