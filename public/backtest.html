@@ -86,6 +86,13 @@
         <p class="bt-chart-title">낙폭 (전고점 대비, %)</p>
         <svg id="bt-drawdown-chart" viewBox="0 0 640 110" width="100%"></svg>
       </div>
+      <button class="table-toggle" id="bt-table-toggle">월별 데이터 표로 보기</button>
+      <div class="table-wrap" id="bt-table-wrap" hidden>
+        <table>
+          <thead><tr><th>날짜</th><th>자산가치(원)</th><th>낙폭</th></tr></thead>
+          <tbody id="bt-table-body"></tbody>
+        </table>
+      </div>
       <p class="bt-note" style="margin-top:12px;">
         2010년 2월 이전(2007~2010, 약 2.4년)은 TQQQ가 아직 없던 시기라 QQQ 수익률의 3배로
         근사했다. 닷컴버블(2000~2002)은 정크본드 지표(HYG)가 2007년에야 생겨서 실제 데이터로는
@@ -193,6 +200,18 @@
 
     drawEquityChart();
     drawDrawdownChart();
+
+    const btTableBody = document.getElementById("bt-table-body");
+    btTableBody.innerHTML = BT_POINTS.map(p =>
+      `<tr><td>${p.date}</td><td>${p.value.toLocaleString("ko-KR")}</td><td>${(p.drawdown * 100).toFixed(1)}%</td></tr>`
+    ).join("");
+
+    const btTableToggleBtn = document.getElementById("bt-table-toggle");
+    btTableToggleBtn.addEventListener("click", () => {
+      const wrap = document.getElementById("bt-table-wrap");
+      wrap.hidden = !wrap.hidden;
+      btTableToggleBtn.textContent = wrap.hidden ? "월별 데이터 표로 보기" : "표 숨기기";
+    });
   </script>
 </body>
 </html>
