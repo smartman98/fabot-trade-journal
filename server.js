@@ -148,9 +148,16 @@ app.get("/api/balance", async (req, res) => {
     brokers[row.broker].push(row);
   }
 
+  // 화면 표시 순서(키움 먼저, KIS 다음)를 고정한다. Supabase는 market 컬럼으로만
+  // 정렬하므로 같은 market 안에서의 순서는 보장되지 않아, upsert 이후 행 순서가
+  // 바뀌면 두 계좌 섹션의 위아래가 뒤바뀌는 문제가 있었다(2026-09-10).
+  const BROKER_ORDER = ["Kiwoom", "KIS"];
   const result = {};
+  for (const broker of BROKER_ORDER) {
+    if (brokers[broker]) result[broker] = { rows: brokers[broker], summary: summarize(brokers[broker]) };
+  }
   for (const [broker, rows] of Object.entries(brokers)) {
-    result[broker] = { rows, summary: summarize(rows) };
+    if (!result[broker]) result[broker] = { rows, summary: summarize(rows) };
   }
   res.json(result);
 });
