@@ -9,6 +9,40 @@ const detailView = document.getElementById("detail-view");
 
 const tradeList = document.getElementById("trade-list");
 const loadingEl = document.getElementById("loading");
+const authLink = document.getElementById("auth-link");
+
+// ---------- 로그인 상태 (2026-09-13) ----------
+// 계좌 잔고/매매기록은 로그인해야만 보이고, 게스트는 F&G 지수·전략 설명만 볼 수 있다.
+let isLoggedIn = false;
+
+function updateAuthUI() {
+  if (!authLink) return;
+  if (isLoggedIn) {
+    authLink.textContent = "🔓 로그아웃";
+    authLink.href = "#";
+  } else {
+    authLink.textContent = "🔑 로그인";
+    authLink.href = "login.html";
+  }
+}
+
+authLink?.addEventListener("click", async (e) => {
+  if (!isLoggedIn) return; // 로그인 안 된 상태에서는 그냥 login.html로 이동
+  e.preventDefault();
+  await fetch("/api/logout", { method: "POST" });
+  window.location.reload();
+});
+
+async function fetchSession() {
+  try {
+    const res = await fetch("/api/session", { cache: "no-store" });
+    const data = await res.json();
+    isLoggedIn = !!data.loggedIn;
+  } catch {
+    isLoggedIn = false;
+  }
+  updateAuthUI();
+}
 
 const cancelBtn = document.getElementById("cancel-btn");
 const tradeForm = document.getElementById("trade-form");
@@ -154,6 +188,11 @@ async function fetchTrades() {
   const res = await fetch(API);
   const data = await res.json();
   loadingEl.hidden = true;
+  if (data.locked) {
+    allTrades = [];
+    listView.hidden = true;
+    return;
+  }
   allTrades = data.trades;
   renderOrphanTrades();
   if (Object.keys(balanceData).length > 0) renderAllBalanceSections();
@@ -677,6 +716,7 @@ async function fetchFgHistory() {
   if (history.length > 0) renderFgAll(currentActiveRange());
 }
 
+fetchSession();
 fetchTrades();
 fetchTodaySignal();
 fetchFgHistory();
@@ -1086,11 +1126,25 @@ function renderAllBalanceSections() {
   }
 }
 
+function renderBalanceLocked() {
+  balanceSectionsEl.innerHTML = `
+    <div class="balance-locked">
+      <p>🔒 계좌 잔고와 매매 기록은 로그인 후에 볼 수 있습니다.</p>
+      <a href="login.html" class="primary-btn" style="display:inline-block;text-decoration:none;">로그인</a>
+    </div>
+  `;
+}
+
 async function fetchBalance() {
   try {
     const res = await fetch("/api/balance", { cache: "no-store" });
     if (!res.ok) return;
-    balanceData = await res.json();
+    const data = await res.json();
+    if (data.locked) {
+      renderBalanceLocked();
+      return;
+    }
+    balanceData = data;
     renderAllBalanceSections();
     renderOrphanTrades();
   } catch {

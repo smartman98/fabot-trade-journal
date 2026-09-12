@@ -1,6 +1,8 @@
 require("dotenv").config();
 const path = require("path");
+const crypto = require("crypto");
 const express = require("express");
+const cookieParser = require("cookie-parser");
 const { createClient } = require("@supabase/supabase-js");
 const { fetchLiveSnapshot } = require("./broker_live");
 const { maybeSnapshot } = require("./balance_history");
@@ -9,9 +11,67 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 const app = express();
 app.use(express.json());
+app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
 const VALID_ACTIONS = ["buy", "sell", "dividend"];
+
+// ---------- 로그인 (2026-09-13) ----------
+// 계좌 잔고/매매기록은 실제 돈 숫자라 로그인해야만 보이고, 게스트는 F&G 지수·전략
+// 설명 페이지만 볼 수 있어야 한다는 사용자 요청. 세션을 DB나 서버 메모리에 저장하지
+// 않고, 항상 같은 비밀키(SESSION_SECRET)로 만든 서명 토큰을 쿠키에 담아 검증한다 —
+// 서버가 재시작돼도 로그인이 풀리지 않고, 별도 세션 저장소도 필요 없다. 기존 로그인을
+// 전부 무효화하고 싶으면 SESSION_SECRET만 바꾸면 된다.
+const SESSION_COOKIE = "fabot_session";
+
+function safeEquals(a, b) {
+  const bufA = Buffer.from(String(a));
+  const bufB = Buffer.from(String(b));
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function makeSessionToken() {
+  return crypto.createHmac("sha256", process.env.SESSION_SECRET).update(process.env.APP_USERNAME || "").digest("hex");
+}
+
+function isLoggedIn(req) {
+  if (!process.env.APP_USERNAME || !process.env.APP_PASSWORD || !process.env.SESSION_SECRET) return false;
+  const token = req.cookies && req.cookies[SESSION_COOKIE];
+  if (!token) return false;
+  return safeEquals(token, makeSessionToken());
+}
+
+function requireLogin(req, res, next) {
+  if (!isLoggedIn(req)) return res.status(401).json({ error: "로그인이 필요합니다." });
+  next();
+}
+
+app.post("/api/login", (req, res) => {
+  if (!process.env.APP_USERNAME || !process.env.APP_PASSWORD || !process.env.SESSION_SECRET) {
+    return res.status(500).json({ error: "서버에 로그인 설정이 안 되어 있습니다." });
+  }
+  const { username, password } = req.body || {};
+  const ok = safeEquals(username || "", process.env.APP_USERNAME) && safeEquals(password || "", process.env.APP_PASSWORD);
+  if (!ok) return res.status(401).json({ error: "아이디 또는 비밀번호가 틀렸습니다." });
+
+  res.cookie(SESSION_COOKIE, makeSessionToken(), {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+  });
+  res.json({ ok: true });
+});
+
+app.post("/api/logout", (req, res) => {
+  res.clearCookie(SESSION_COOKIE);
+  res.json({ ok: true });
+});
+
+app.get("/api/session", (req, res) => {
+  res.json({ loggedIn: isLoggedIn(req) });
+});
 
 // FABOT 매매 규칙 (fg-dashboard의 today_signal.py와 동일한 기준)
 function judgeSignal(score) {
@@ -139,6 +199,7 @@ function summarize(rows) {
 }
 
 app.get("/api/balance", async (req, res) => {
+  if (!isLoggedIn(req)) return res.json({ locked: true });
   const { data, error } = await supabase.from("demo_balance").select("*").order("market", { ascending: true });
   if (error) return res.status(500).json({ error: error.message });
 
@@ -164,6 +225,7 @@ app.get("/api/balance", async (req, res) => {
 
 // 계좌별 일별(종가 기준) 수익/수익률 히스토리 — balance_history.py가 하루 1건씩 쌓아둔 걸 그대로 반환
 app.get("/api/balance-history", async (req, res) => {
+  if (!isLoggedIn(req)) return res.json({ locked: true });
   const { data, error } = await supabase
     .from("balance_history")
     .select("*")
@@ -181,6 +243,7 @@ app.get("/api/balance-history", async (req, res) => {
 // 계좌별 예수금(현금) — 자산구성(%) 화면에서 "현금" 비중 표시용. demo_balance(보유종목)와
 // 별개 표라서 계좌 잔고 요약(총매입/총평가/총수익률)의 기존 계산에는 영향 없음.
 app.get("/api/cash", async (req, res) => {
+  if (!isLoggedIn(req)) return res.json({ locked: true });
   const { data, error } = await supabase.from("demo_cash").select("*");
   if (error) return res.status(500).json({ error: error.message });
 
@@ -263,6 +326,7 @@ setInterval(() => {
 
 // 목록 조회 + 요약 통계
 app.get("/api/trades", async (req, res) => {
+  if (!isLoggedIn(req)) return res.json({ locked: true, trades: [], summary: null });
   const { data, error } = await supabase
     .from("trades")
     .select("*")
@@ -292,14 +356,14 @@ app.get("/api/trades", async (req, res) => {
 });
 
 // 단건 상세 조회
-app.get("/api/trades/:id", async (req, res) => {
+app.get("/api/trades/:id", requireLogin, async (req, res) => {
   const { data, error } = await supabase.from("trades").select("*").eq("id", req.params.id).single();
   if (error) return res.status(404).json({ error: "기록을 찾을 수 없습니다." });
   res.json(data);
 });
 
 // 추가
-app.post("/api/trades", async (req, res) => {
+app.post("/api/trades", requireLogin, async (req, res) => {
   const { trade, errors } = validateTrade(req.body);
   if (errors.length > 0) return res.status(400).json({ error: errors.join(" ") });
 
@@ -309,7 +373,7 @@ app.post("/api/trades", async (req, res) => {
 });
 
 // 수정
-app.put("/api/trades/:id", async (req, res) => {
+app.put("/api/trades/:id", requireLogin, async (req, res) => {
   const { trade, errors } = validateTrade(req.body, { partial: true });
   if (errors.length > 0) return res.status(400).json({ error: errors.join(" ") });
 
@@ -324,7 +388,7 @@ app.put("/api/trades/:id", async (req, res) => {
 });
 
 // 삭제
-app.delete("/api/trades/:id", async (req, res) => {
+app.delete("/api/trades/:id", requireLogin, async (req, res) => {
   const { error } = await supabase.from("trades").delete().eq("id", req.params.id);
   if (error) return res.status(500).json({ error: error.message });
   res.status(204).end();
