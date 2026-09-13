@@ -39,32 +39,39 @@
     <p class="sub">왜 이 전략(TQQQ + 커버드콜, F&G 기반)에 투자하는가 — 2026-07-12 검증 결과</p>
     <p><a href="index.html">← 매매 일지로 돌아가기</a></p>
 
-    <div class="bt-section">
-      <h2>전략 요약</h2>
-      <p class="bt-note">
-        두 자산이 서로 다른 역할을 한다.<br>
-        <strong>커버드콜(수비)</strong> — 나스닥100의 약 90%를 추종(베타 0.9)하면서 연 15%를 매달 분배.
-        "2세대 커버드콜"은 상승 제한된 안전자산이 아니라 실질적으로 분배금 나오는 성장자산 — 실제 계좌
-        데이터로 확인됨(31개월 실측 분배금 수익률 13~20%/년, 누적 약 7,010만원).<br>
-        <strong>TQQQ(공격)</strong> — 3배 레버리지, F&amp;G 사이클에 따라 매매.
-      </p>
+    <div id="bt-locked-placeholder" class="balance-locked">
+      <p>🔒 전략 요약과 현재 매매 규칙은 로그인 후에 볼 수 있습니다.</p>
+      <a href="login.html" class="primary-btn" style="display:inline-block;text-decoration:none;">로그인</a>
     </div>
 
-    <div class="bt-section">
-      <h2>현재 매매 규칙</h2>
-      <table class="bt-table">
-        <thead><tr><th>조건</th><th>동작</th></tr></thead>
-        <tbody>
-          <tr><td>F&amp;G ≤ 30</td><td>TQQQ 25% 매수</td></tr>
-          <tr><td>F&amp;G ≤ 25</td><td>TQQQ 50% 매수</td></tr>
-          <tr><td>F&amp;G ≤ 20</td><td>TQQQ 100% 매수</td></tr>
-          <tr><td>F&amp;G 35~65 (평시)</td><td>커버드콜 10% 추가매수</td></tr>
-          <tr><td>F&amp;G ≥ 72</td><td>TQQQ 보유분 50% 매도</td></tr>
-          <tr><td>F&amp;G ≥ 77</td><td>TQQQ 잔량 전량 매도</td></tr>
-          <tr><td>매수/매도 후</td><td>4거래일 대기 기간</td></tr>
-        </tbody>
-      </table>
-      <p class="bt-note">2026-08-31 분기 재최적화 결과 반영(10년 블록부트스트랩 랜덤서치). 다음 재검토: 2026-11-30.</p>
+    <div id="bt-strategy-section" hidden>
+      <div class="bt-section">
+        <h2>전략 요약</h2>
+        <p class="bt-note">
+          두 자산이 서로 다른 역할을 한다.<br>
+          <strong>커버드콜(수비)</strong> — 나스닥100의 약 90%를 추종(베타 0.9)하면서 연 15%를 매달 분배.
+          "2세대 커버드콜"은 상승 제한된 안전자산이 아니라 실질적으로 분배금 나오는 성장자산 — 실제 계좌
+          데이터로 확인됨(31개월 실측 분배금 수익률 13~20%/년, 누적 약 7,010만원).<br>
+          <strong>TQQQ(공격)</strong> — 3배 레버리지, F&amp;G 사이클에 따라 매매.
+        </p>
+      </div>
+
+      <div class="bt-section">
+        <h2>현재 매매 규칙</h2>
+        <table class="bt-table">
+          <thead><tr><th>조건</th><th>동작</th></tr></thead>
+          <tbody>
+            <tr><td>F&amp;G ≤ 30</td><td>TQQQ 25% 매수</td></tr>
+            <tr><td>F&amp;G ≤ 25</td><td>TQQQ 50% 매수</td></tr>
+            <tr><td>F&amp;G ≤ 20</td><td>TQQQ 100% 매수</td></tr>
+            <tr><td>F&amp;G 35~65 (평시)</td><td>커버드콜 10% 추가매수</td></tr>
+            <tr><td>F&amp;G ≥ 72</td><td>TQQQ 보유분 50% 매도</td></tr>
+            <tr><td>F&amp;G ≥ 77</td><td>TQQQ 잔량 전량 매도</td></tr>
+            <tr><td>매수/매도 후</td><td>4거래일 대기 기간</td></tr>
+          </tbody>
+        </table>
+        <p class="bt-note">2026-08-31 분기 재최적화 결과 반영(10년 블록부트스트랩 랜덤서치). 다음 재검토: 2026-11-30.</p>
+      </div>
     </div>
 
     <div class="bt-section">
@@ -420,6 +427,18 @@
       wrap.hidden = !wrap.hidden;
       btTableToggleBtn.textContent = wrap.hidden ? "월별 데이터 표로 보기" : "표 숨기기";
     });
+
+    // 전략 요약/현재 매매 규칙은 실제 라이브 매매 임계값이라 로그인해야만 보인다
+    // (2026-09-13 사용자 요청). 기본은 잠금 화면이고, 로그인 상태 확인 후에만 보여준다.
+    fetch("/api/session", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.loggedIn) {
+          document.getElementById("bt-locked-placeholder").hidden = true;
+          document.getElementById("bt-strategy-section").hidden = false;
+        }
+      })
+      .catch(() => {});
   </script>
 </body>
 </html>
