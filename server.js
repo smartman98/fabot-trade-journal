@@ -149,10 +149,13 @@ app.get("/api/signal/today", async (req, res) => {
 // (2026-08-13 실측: "오늘의 신호"는 62인데 추이 차트 마지막 점은 7월 말 41.7로 따로 놈).
 // 최근 순으로 페이지네이션하면서 날짜 90개가 모일 때까지만 받아오면, 쌓인 행 개수와
 // 상관없이 항상 최근 90일을 정확히 잡는다.
-app.get("/api/signal/history", async (req, res) => {
-  const TARGET_DAYS = 90;
+async function fetchFgHistoryLegacy(res, TARGET_DAYS) {
+  // cnn_real은 값이 안 바뀌어도 크론이 돌 때마다 매번 새로 한 행씩 쌓인다(하루 1,000행
+  // 이상) — "오래된 순으로 최대 5만 행" 페이지네이션이라 최근 90일을 채우려면 순차
+  // 왕복이 수십 번 걸려 느리다(2026-09-13 사용자 지적). fg_daily_history() DB 함수가
+  // 있으면 그쪽을 쓰고, 이건 그 함수가 아직 없는 환경(예: 마이그레이션 전)에서만 쓰는
+  // 예전 방식 폴백이다.
   const PAGE_SIZE = 1000;
-
   const byDate = new Map(); // date -> score (최근 순으로 훑으므로 그 날짜의 첫 값 = 가장 최신 값)
   let offset = 0;
   for (let page = 0; page < 50; page += 1) { // 안전장치: 최대 5만 행까지만
@@ -179,6 +182,22 @@ app.get("/api/signal/history", async (req, res) => {
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-TARGET_DAYS);
   res.json(series);
+}
+
+app.get("/api/signal/history", async (req, res) => {
+  const TARGET_DAYS = 90;
+
+  // 하루당 한 값만 뽑아주는 DB 함수(fg_daily_history)를 한 번만 호출 — 수십 번 왕복하던
+  // 예전 방식보다 훨씬 빠르다. 함수가 없는 환경에서는 예전 방식으로 자동 대체한다.
+  const { data: rpcData, error: rpcError } = await supabase.rpc("fg_daily_history", { target_days: TARGET_DAYS });
+  if (!rpcError && rpcData) {
+    const series = rpcData
+      .map((row) => ({ date: row.day, score: row.score }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    return res.json(series);
+  }
+
+  return fetchFgHistoryLegacy(res, TARGET_DAYS);
 });
 
 // 모의투자 계좌 잔고 — 증권사별로 완전히 별개인 계좌라 broker별로 묶어서 반환한다
