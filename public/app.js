@@ -971,6 +971,10 @@ function renderBalanceRowsFor(broker) {
     let krwHint = "";
     if (currency === "ALL" && r.currency === "USD") {
       krwHint = ` <span class="muted">(${formatMoney(r.krw_current_value / r.quantity)}원)</span>`;
+    } else if (isKrwView && r.currency === "USD") {
+      // 원화 탭에서도 해외 종목(TQQQ 등)은 달러 현재가를 같이 보여준다
+      // (2026-09-15 사용자 요청).
+      krwHint = ` <span class="muted">($${Number(r.current_price).toLocaleString("ko-KR", { maximumFractionDigits: 2 })})</span>`;
     }
 
     const tr = document.createElement("tr");
